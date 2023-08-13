@@ -101,8 +101,3 @@ decent **with** streaming
 
 > **PromptExperiment**: true
 
-## Downloads
-
-> ### [Download latest version](https://gitgud.io/ahsk/clewd/)
-
-> ### [Download 2.7](https://gitgud.io/ahsk/clewd/-/archive/2.7/clewd-2.7.zip)
