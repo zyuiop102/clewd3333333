@@ -2,7 +2,7 @@
  * PASTE YOUR COOKIE BETWEEN THE QUOTES
  * @preserve 
  */
-const Cookie = '';
+const Cookies = '';
 
 /**
 ## EXPERIMENTAL
@@ -63,21 +63,116 @@ const Cookie = '';
  * @preserve 
  */
 const Settings = {
-    AntiStall: 2,
-    ClearFlags: false,
-    DeleteChats: false,
-    PassParams: false,
-    PreventImperson: false,
-    PromptExperiment: true,
-    RecycleChats: false,
-    ReplaceSamples: false,
-    RetryRegenerate: false,
-    StripAssistant: false,
-    StripHuman: false
+    padtxt: process.env.padtxt || true,  //自动补全tokens超过10000
+    ReplaceSamples: process.env.ReplaceSamples || false,
+    AntiStall: process.env.AntiStall || 2,
+    ClearFlags: process.env.ClearFlags || true,
+    DeleteChats: process.env.DeleteChats || false,
+    PassParams: process.env.PassParams || false,
+    PreventImperson: process.env.PreventImperson || false,
+    PromptExperiment: process.env.PromptExperiment || true,
+    RecycleChats: process.env.RecycleChats || false,
+    RetryRegenerate: process.env.RetryRegenerate || false,
+    StripAssistant: process.env.StripAssistant || true,
+    StripHuman: process.env.StripHuman || false,
+    RemoveFirstH: process.env.RemoveFirstH || true, //去除开始的Human/H
+    FullColon: process.env.FullColon || true, //根源性防止HA
+    xmlPlot: process.env.xmlPlot || true, //自动xml tags附加，<card>触发
+    localtunnel: false,  //创建用于外网访问的隧道URL
+    VPNfree: false  //使用国内镜像站claudeai.ai，免除代理但速度较慢
 };
 
-const Ip = '127.0.0.1';
-const Port = 8444;
+/***********************/
+const Ip = process.env.PORT ? '0.0.0.0' : '127.0.0.1';
+const Port = process.env.PORT || 8444;
+
+const Cookie = process.env.Cookie || Cookies;
+
+const padJson = (json) => {
+    const bytes = randomInt(5, 15);
+    var placeholder = randomBytes(bytes).toString('hex'); // 定义占位符
+    var sizeInBytes = new Blob([json]).size; // 计算json数据的字节大小
+
+    // 计算需要添加的占位符数量, 注意你需要注意到UTF-8编码中中文字符占3字节
+    var count = Math.floor((32000 - sizeInBytes) / new Blob([placeholder]).size); 
+
+    // 生成占位符字符串
+    var padding = '';
+    for (var i = 0; i < count; i++) {
+        padding += placeholder;
+    }
+
+    // 在json前面添加占位符, 在末尾增加空行然后添加json
+    if (Settings.padtxt) {
+        var result = padding + '\n\n\n' + json;
+    }
+    else {
+        var result = json;
+    }
+
+    result = result.replace(/^\s*/, '');
+
+    return result
+};
+
+const RemoveFirstHuman = (json) => {
+    const regex = /^\s*(H(?:uman)?:)/;
+    const result = json.replace(regex, '').trim();
+    return result
+};
+
+const AddxmlPlot = (content) => {
+    // 检查内容中是否包含"<card>","[Start a new"字符串
+    if (!content.includes('<card>')) {
+        return content;
+    }
+
+    content = content.replace(/\n\nSystem:\s*/g, '\n\n');
+
+    // 在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>"
+    let firstChatStart = content.indexOf('\n\n[Start a new');
+    let lastChatStart = content.lastIndexOf('\n\n[Start a new');
+    if (firstChatStart != -1) { 
+        content = content.slice(0, firstChatStart) + '\n\n</card>\n\n<example>' + 
+                content.slice(firstChatStart, lastChatStart) + '\n\n</example>' + 
+                content.slice(lastChatStart);
+    }
+        
+    // 之后的第一个"Assistant: "之前插入"\n\n<plot>"
+    let lastChatIndex = content.lastIndexOf('\n\n[Start a new');
+    if (lastChatIndex != -1 && content.includes('</plot>')) { 
+        let assistantIndex = content.indexOf('\n\nAssistant:', lastChatIndex);
+        if (assistantIndex != -1) {
+            content = content.slice(0, assistantIndex) + '\n\n<plot>' + content.slice(assistantIndex);
+        }
+    }
+  
+    let sexMatch = content.match(/\n##.*?\n<sex>[\s\S]*?<\/sex>\n/);
+    let deleteMatch = content.match(/\n##.*?\n<delete>[\s\S]*?<\/delete>\n/);
+  
+    if (sexMatch && deleteMatch) {
+        content = content.replace(sexMatch[0], ""); // 移除<sex>部分
+        content = content.replace(deleteMatch[0], sexMatch[0] + deleteMatch[0]); // 将<sex>部分插入<delete>部分的前面
+    }
+
+    let illustrationMatch = content.match(/\n##.*?\n<illustration>[\s\S]*?<\/illustration>\n/);
+
+    if (illustrationMatch && deleteMatch) {
+        content = content.replace(illustrationMatch[0], ""); // 移除<sex>部分
+        content = content.replace(deleteMatch[0], illustrationMatch[0] + deleteMatch[0]); // 将<illustration>部分插入<delete>部分的前面
+    }
+
+    content = content.replace(/\n\n<(hidden|\/plot)>[\s\S]*?\n\n<extra_prompt>\s*/, '\n\nHuman:'); //sd prompt用
+
+    //消除空XML tags或多余的\n
+    content = content.replace(/(?<=\n<(card|hidden|example)>\n)\s*/g, '');
+    content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
+    content = content.replace(/\n\n<(example|hidden)>\n<\/\1>/g, '');
+
+    return content
+};
+
+/***********************/
 
 /**
  * Don't touch StallTriggerMax.
@@ -93,7 +188,7 @@ const StallTrigger = 1572864;
  * @default 8
  * @preserve 
  */
-const BufferSize = 8;
+const BufferSize = 1;
 
 const {createServer: Server, IncomingMessage: IncomingMessage, ServerResponse: ServerResponse} = require('node:http');
 const {createHash: Hash, randomUUID: randomUUID, randomInt: randomInt, randomBytes: randomBytes} = require('node:crypto');
@@ -128,7 +223,7 @@ ServerResponse.prototype.json = async function(body, statusCode = 200, headers) 
 };
 
 const AI = {
-    end: () => Buffer.from([ 104, 116, 116, 112, 115, 58, 47, 47, 99, 108, 97, 117, 100, 101, 46, 97, 105 ]).toString(),
+    end: () => Settings.VPNfree ? Buffer.from([ 104, 116, 116, 112, 115, 58, 47, 47, 99, 104, 97, 116, 46, 99, 108, 97, 117, 100, 101, 97, 105, 46, 97, 105 ]).toString() : Buffer.from([ 104, 116, 116, 112, 115, 58, 47, 47, 99, 108, 97, 117, 100, 101, 46, 97, 105 ]).toString(),
     modelA: () => Buffer.from([ 99, 108, 97, 117, 100, 101, 45, 50 ]).toString(),
     modelB: () => Buffer.from([ 99, 108, 97, 117, 100, 101, 45, 105, 110, 115, 116, 97, 110, 116, 45, 49 ]).toString(),
     agent: () => Buffer.from([ 77, 111, 122, 105, 108, 108, 97, 47, 53, 46, 48, 32, 40, 87, 105, 110, 100, 111, 119, 115, 32, 78, 84, 32, 49, 48, 46, 48, 59, 32, 87, 105, 110, 54, 52, 59, 32, 120, 54, 52, 41, 32, 65, 112, 112, 108, 101, 87, 101, 98, 75, 105, 116, 47, 53, 51, 55, 46, 51, 54, 32, 40, 75, 72, 84, 77, 76, 44, 32, 108, 105, 107, 101, 32, 71, 101, 99, 107, 111, 41, 32, 67, 104, 114, 111, 109, 101, 47, 49, 49, 52, 46, 48, 46, 48, 46, 48, 32, 83, 97, 102, 97, 114, 105, 47, 53, 51, 55, 46, 51, 54, 32, 69, 100, 103, 47, 49, 49, 52, 46, 48, 46, 49, 56, 50, 51, 46, 55, 57 ]).toString()
@@ -346,7 +441,7 @@ class ClewdStream extends TransformStream {
                     controller.enqueue(this.#build(this.#compPure.length));
                 }
             } else {
-                this.#compLast = completion;
+                this.#compLast += completion; //=
                 this.#stallCheck(controller);
                 this.#impersonationCheck(controller, this.#compLast);
             }
@@ -363,7 +458,7 @@ const Proxy = Server(((req, res) => {
                 param: null,
                 code: 404
             }
-        }, 404);
+        }, 200); //404
     }
     setTitle('recv...');
     let fetchAPI;
@@ -416,12 +511,19 @@ const Proxy = Server(((req, res) => {
                 };
                 return Settings.ReplaceSamples && (replacers.H[0].test(text) || replacers.A[0].test(text)) ? text.replace(replacers.H[0], replacers.H[1]).replace(replacers.A[0], replacers.A[1]) : text;
             })(genericFixes(prompt));
+/*****************************/
+            if (Settings.RemoveFirstH) {prompt = RemoveFirstHuman(prompt);}
+            if (Settings.xmlPlot) {prompt = AddxmlPlot(prompt);}
+            if (Settings.FullColon) {prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '：');}
+/*****************************/   
             if (Settings.PromptExperiment && !samePrompt) {
                 attachments.push({
-                    extracted_content: prompt,
-                    file_name: fileName(),
+/*****************************/
+                    extracted_content: padJson(prompt),
+                    file_name: 'paste.txt',  //fileName(),
                     file_size: Buffer.from(prompt).length,
-                    file_type: 'text/plain'
+                    file_type: 'txt'  //'text/plain'
+/*****************************/  
                 });
                 prompt = '';
             }
@@ -531,6 +633,15 @@ Proxy.listen(Port, Ip, (async () => {
     updateCookies(Cookie);
     updateCookies(accRes);
     console.log(`[2mclewd v2.6[0m\n[33mhttp://${Ip}:${Port}/v1[0m\n\n${Object.keys(Settings).map((setting => `[1m${setting}:[0m [36m${Settings[setting]}[0m`)).sort().join('\n')}\n`);
+/*******************************/    
+    if (Settings.localtunnel) {
+        const localtunnel = require('localtunnel');
+        localtunnel({ port: Port })
+        .then((tunnel) => {
+            console.log(`\nTunnel URL for outer websites: ${tunnel.url}/v1\n`);
+        })
+    }
+/*******************************/      
     console.log('Logged in %o', {
         name: accInfo.name?.split('@')?.[0],
         capabilities: accInfo.capabilities
