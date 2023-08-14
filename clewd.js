@@ -282,7 +282,7 @@ const deleteChat = async uuid => {
 };
 
 const setTitle = title => {
-    title = 'clewd v2.7修改版 - ' + title;
+    title = 'clewd v2.7修改版 by tera - ' + title;
     process.title !== title && (process.title = title);
 };
 
@@ -560,7 +560,7 @@ const Proxy = Server(((req, res) => {
                         ...Settings.PassParams && {
                             temperature: temperature
                         },
-                        incremental: true === body.stream,
+                        //incremental: true === body.stream,
                         prompt: prompt,
                         timezone: 'America/New_York',
                         model: model
@@ -632,7 +632,7 @@ Proxy.listen(Port, Ip, (async () => {
     setTitle('ok');
     updateCookies(Cookie);
     updateCookies(accRes);
-    console.log(`[2mclewd v2.7修改版[0m\n[33mhttp://${Ip}:${Port}/v1[0m\n\n${Object.keys(Settings).map((setting => `[1m${setting}:[0m [36m${Settings[setting]}[0m`)).sort().join('\n')}\n`);
+    console.log(`[2mclewd v2.7修改版 by tera[0m\n[33mhttp://${Ip}:${Port}/v1[0m\n\n${Object.keys(Settings).map((setting => `[1m${setting}:[0m [36m${Settings[setting]}[0m`)).sort().join('\n')}\n`);
 /*******************************/    
     if (Settings.localtunnel) {
         const localtunnel = require('localtunnel');
