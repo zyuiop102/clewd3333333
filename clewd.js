@@ -181,7 +181,7 @@ const AddxmlPlot = (content) => {
         padtxt: true,
         xmlPlot: true,
         localtunnel: false,       
-        VPNfree: false
+        VPNfree: true
     },
     ExampleChatPrefix: '[Start a new Chat]\n\n',
     RealChatPrefix: '[Start a new Chat]\n\n',
