@@ -16,7 +16,7 @@
 
 [原版Clewd](https://gitgud.io/ahsk/clewd) 
 
-[Clewd教程](https://rentry.org/teralomaniac_clewd) 
+[Clewd教程（必读）](https://rentry.org/teralomaniac_clewd) 
 <br>
 <br>
 <hr>
@@ -28,7 +28,9 @@
 
 ## Requirements
 
-nodejs>=20.4.*
+- [nodejs>=20.4.*](https://nodejs.org/en/download/current)
+
+- [git>=2.41.*](https://gitforwindows.org/)
 
 ## Defaults
 
