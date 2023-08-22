@@ -7,8 +7,7 @@
     "node": ">=20.4.0"
   },
   "scripts": {
-    "run": "node clewd.js",
-    "postinstall": "npm update && npm i clewd-superfetch"
+    "run": "node clewd.js"
   },
   "keywords": [
     "doom",
@@ -37,7 +36,7 @@
     "url": "https://gitgud.io/ahsk/clewd/-/issues"
   },
   "dependencies": {
-    "clewd-superfetch": "github:h-a-s-k/clewd-superfetch",
-    "localtunnel": "^2.0.2"
+    "localtunnel": "^2.0.2",
+    "ws": "^8.13.0"
   }
 }
