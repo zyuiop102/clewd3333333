@@ -64,7 +64,7 @@ let prevImpersonated = false;
 let uuidOrg;
 
 /******************************************************* */
-let currentIndex = 1;
+let currentIndex = 0;
 
 let Firstlogin = true;
 
@@ -356,8 +356,8 @@ const onListen = async () => {
         }
     }
     if (Config.CookieArray.length > 0) {
-        currentIndex = (currentIndex + 1) % Config.CookieArray.length;
-        Config.Cookie = Config.CookieArray[currentIndex - 1];
+        currentIndex = (currentIndex + 1) % (Config.CookieArray.length - 1);
+        Config.Cookie = Config.CookieArray[currentIndex];
     }
 /***************************** */    
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
