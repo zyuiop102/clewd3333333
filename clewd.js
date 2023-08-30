@@ -356,7 +356,7 @@ const onListen = async () => {
         }
     }
     if (Config.CookieArray.length > 0) {
-        currentIndex = (currentIndex + 1) % (Config.CookieArray.length - 1);
+        currentIndex = (currentIndex + 1) % Config.CookieArray.length;
         Config.Cookie = Config.CookieArray[currentIndex];
     }
 /***************************** */    
