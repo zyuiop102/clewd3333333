@@ -60,10 +60,35 @@ const simpletokenizer = (str) => {
         return content;
     }
 
-    content = content.replace(/\[Start a new chat\]/gm, '\n[Start a new chat]');
-    content = content.replace(/\n\nSystem:\s*/g, '\n\n');
+    //格式顺序交换
+    let segcontentHuman = content.split('\n\nHuman:');
+    const processedsegHuman = segcontentHuman.map(seg => {
+        seg = seg.replace(/(\n\nAssistant:.*?)(\n\nxmlPlot:.*)/gs, '$2$1');
+        return seg = seg.replace(/xmlPlot:\s*/gm, '');
+    });
+    content = processedsegHuman.join('\n\nHuman:');
+    let segcontentAssistant = content.split('\n\nAssistant:');
+    const processedsegAssistant = segcontentAssistant.map(seg => {
+        let processedseg = seg.replace(/(\n\nHuman:.*?)\n\nPrevAssistant:(.*)/gs, '\n\n$2$1');
+        return seg = processedseg.replace(/(.*?)\n\nPrevHuman:(.*$)/gs, ':tnatsissA$2\n\nAssistant:$1');
+    });
+    content = processedsegAssistant.join('\n\nAssistant:');
+    content = content.replace(/Assistant:\s*:tnatsissA\s*/gm, '');
+    content = content.replace(/\n\nTemp(Assistant|Human):/g, '\n\n$1:');
+
+    //越狱倒置
+    segcontentHuman = content.split('\n\nHuman:');
+    const seglength = content.split('\n\nHuman:').length;
+    if (/Assistant: *.$/.test(content) && seglength > 1 && !segcontentHuman[seglength - 2].includes('\n\nAssistant:')) {
+        segcontentHuman[seglength - 2] = segcontentHuman.splice(seglength - 1, 1, segcontentHuman[seglength - 2])[0];
+    }
+    content = segcontentHuman.join('\n\nHuman:');
+
+    //给开头加上<file-attachment-contents>用于截断附加文件标识
+    content.includes('<file-attachment-contents>') && (content = '</file-attachment-contents>\n\n' + content);
 
     // 在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>"
+    content = content.replace(/\[Start a new chat\]/gm, '\n[Start a new chat]');
     const firstChatStart = content.indexOf('\n\n[Start a new');
     const lastChatStart = content.lastIndexOf('\n\n[Start a new');
     firstChatStart != -1 && (content = content.slice(0, firstChatStart) + '\n\n</card>\n\n<example>' + content.slice(firstChatStart, lastChatStart) + '\n\n</example>' + content.slice(lastChatStart));
@@ -75,48 +100,6 @@ const simpletokenizer = (str) => {
         assistantIndex != -1 && (content = content.slice(0, assistantIndex) + '\n\n<plot>' + content.slice(assistantIndex));
     }
 
-    const sexMatch = content.match(/\n##.*?\n<(sex|behavior)>[\s\S]*?<\/\1>\n/);
-    const processMatch = content.match(/\n##.*?\n<process>[\s\S]*?<\/process>\n/);
-  
-    if (sexMatch && processMatch) {
-        content = content.replace(sexMatch[0], ''); // 移除<sex>部分
-        content = content.replace(processMatch[0], sexMatch[0] + processMatch[0]); // 将<sex>部分插入<delete>部分的前面
-    }
-
-    const illustrationMatch = content.match(/\n##.*?\n<illustration>[\s\S]*?<\/illustration>\n/);
-
-    if (illustrationMatch && processMatch) {
-        content = content.replace(illustrationMatch[0], ''); // 移除<illustration>部分
-        content = content.replace(processMatch[0], illustrationMatch[0] + processMatch[0]); // 将<illustration>部分插入<delete>部分的前面
-    }
-
-    content = content.replace(/\n\n<(hidden|\/plot)>[\s\S]*?\n\n<extra_prompt>\s*/, '\n\nHuman:'); //sd prompt用
-
-    let altflag = false;
-    if (content.includes('</hidden>')) {
-        const segcontent = content.split('\n\nHuman:');
-        const processedseg = segcontent.map(seg => {
-            return seg.replace(/(\n\nAssistant:[\s\S]+?)(\n\n<hidden>[\s\S]+?<\/hidden>)/g, '$2$1');
-        });
-        const seglength = processedseg.length;
-        if (/Assistant: *.$/.test(content) && seglength > 1 && !processedseg[seglength - 2].includes('\n\nAssistant:')) {
-            altflag = true;
-            processedseg[seglength - 2] = processedseg.splice(seglength - 1, 1, processedseg[seglength - 2])[0];
-        }
-        content = processedseg.join('\n\nHuman:');
-    }
-
-    let advancedJB = false;
-    const prevHumanIndex = content.indexOf("\n\nPrevHuman:");
-    const lastAssistantIndex = content.lastIndexOf("\n\nAssistant:");
-    if (prevHumanIndex != -1 && lastAssistantIndex != -1) {
-        const contentToMove = content.substring(prevHumanIndex);
-        advancedJB = true;
-        content = content.substring(0, prevHumanIndex);
-        content = content.substring(0, lastAssistantIndex) + contentToMove + content.substring(lastAssistantIndex);
-        content = content.replace(/PrevHuman:\s*/, '');
-    }
-
     //消除空XML tags或多余的\n
     content = content.replace(/(\n)<\/hidden>\n+?<hidden>\n/g, '');
     content = content.replace(/\n<(example|hidden)>\n+?<\/\1>/g, '');
@@ -124,10 +107,11 @@ const simpletokenizer = (str) => {
     content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
 
+    //xmlPlot2,以PlainPrompt替换最后的Human
     const altsplitedContent = content.split('\n\nHuman:');
-    if (altsplitedContent.length >= 3 && Config.Settings.xmlPlot === 2 && advancedJB) {
-        const lastIndex = altflag ? altsplitedContent.length - 2 : altsplitedContent.length - 1;
-        content = altsplitedContent.slice(0, lastIndex).join('\n\nHuman:') + '\n\nAltHuman:' + altsplitedContent.slice(lastIndex).join('\n\nHuman:');
+    if (altsplitedContent.length >= 3 && Config.Settings.xmlPlot === 2 && !content.includes('\n\nPlainPrompt:')) {
+        const lastIndex = altsplitedContent.length - 1;
+        content = altsplitedContent.slice(0, lastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + altsplitedContent.slice(lastIndex).join('\n\nHuman:');
     }
 
     return content;
@@ -344,7 +328,7 @@ const updateParams = res => {
         if (currentIndex === Config.CookieArray.length - 1) {
             console.log(`\n\n※※※※※※※※※※※※※※※※※※\n※※※Cookie cleanup completed※※※\n※※※※※※※※※※※※※※※※※※\n\n`);
             process.exit();
-        };
+        }
         changetime += 1;
         let percentage = (changetime / totaltime) * 100;
         console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex}\nstatus: ${res.status}`);
@@ -602,8 +586,7 @@ const updateParams = res => {
                                 return message.content;
                             }
                             let spacing = '';
-                            //idx > 0 && (spacing = systemMessages.includes(message) ? '\n' : '\n\n');
-                            idx > 0 && (spacing = '\n\n');
+                            idx > 0 && (spacing = '\n\n'); //idx > 0 && (spacing = systemMessages.includes(message) ? '\n' : '\n\n');
                             const prefix = message.customname ? message.name + ': ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
                             return `${spacing}${message.strip ? '' : prefix}${'system' === message.role ? message.content : message.content.trim()}`;
                         }));
@@ -624,7 +607,7 @@ const updateParams = res => {
                         const attachments = [];
                         if (Config.Settings.PromptExperiments) {
 /****************************************************************/
-                            let splitprompt = prompt.split('\n\nAltHuman:');
+                            let splitprompt = prompt.split('\n\nPlainPrompt:');
                             prompt = splitprompt[0];
 /****************************************************************/
                             attachments.push({
