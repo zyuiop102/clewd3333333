@@ -84,14 +84,15 @@ const simpletokenizer = (str) => {
     }
     content = segcontentHuman.join('\n\nHuman:');
 
-    //给开头加上<file-attachment-contents>用于截断附加文件标识
+    //给开头加上</file-attachment-contents>用于截断附加文件标识
     content.includes('<file-attachment-contents>') && (content = '</file-attachment-contents>\n\n' + content);
 
     // 在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>"
-    content = content.replace(/\[Start a new chat\]/gm, '\n[Start a new chat]');
+    const exampleNote = content.match(/(?<=<example-note>).*(?=<\/example-note>)/) || '';
+    content = content.replace(/<example-note>.*<\/example-note>/, '');
     const firstChatStart = content.indexOf('\n\n[Start a new');
     const lastChatStart = content.lastIndexOf('\n\n[Start a new');
-    firstChatStart != -1 && (content = content.slice(0, firstChatStart) + '\n\n</card>\n\n<example>' + content.slice(firstChatStart, lastChatStart) + '\n\n</example>' + content.slice(lastChatStart));
+    firstChatStart != -1 && (content = content.slice(0, firstChatStart) + `\n\n</card>\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + '\n\n</example>' + content.slice(lastChatStart));
     
     // 之后的第一个"Assistant: "之前插入"\n\n<plot>"
     const lastChatIndex = content.lastIndexOf('\n\n[Start a new');
