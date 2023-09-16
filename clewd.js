@@ -101,7 +101,7 @@ const simpletokenizer = (str) => {
         assistantIndex != -1 && (content = content.slice(0, assistantIndex) + '\n\n<plot>' + content.slice(assistantIndex));
     }
 
-    //xmlPlot2,以PlainPrompt替换最后的Human
+    //Plain Prompt
     segcontentHuman = content.split('\n\nHuman:');
     let segcontentlastIndex = segcontentHuman.length - 1;
     if (segcontentlastIndex >= 2 && segcontentHuman[segcontentlastIndex].includes('<!-- Plain Prompt Mode On -->') && !content.includes('\n\nPlainPrompt:')) {
@@ -310,8 +310,9 @@ const updateParams = res => {
         }
     }), conversations = await convRes.json();
     updateParams(convRes);
-/**************************** */
-    Conversation.uuid = randomUUID().toString();
+    conversations.length > 0 && await Promise.all(conversations.map((conv => deleteChat(conv.uuid))));
+/***************************** */    
+    const tempuuid = randomUUID().toString();
     const res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
         headers: {
             ...AI.hdr(),
@@ -319,7 +320,7 @@ const updateParams = res => {
         },
         method: 'POST',
         body: JSON.stringify({
-            uuid: Conversation.uuid,
+            uuid: tempuuid,
             name: ''
         })
     });
@@ -338,9 +339,8 @@ const updateParams = res => {
             process.exit();
         }
         return CookieChanger.emit('ChangeCookie');
+/***************************** */        
     }
-/**************************** */
-    conversations.length > 0 && await Promise.all(conversations.map((conv => deleteChat(conv.uuid))));
 }, writeSettings = async (config, firstRun = false) => {
     write(ConfigPath, `/*\n* https://rentry.org/teralomaniac_clewd\n* https://github.com/teralomaniac/clewd\n*/\n\n// SET YOUR COOKIE BELOW\n\nmodule.exports = ${JSON.stringify(config, null, 4)}\n\n/*\n BufferSize\n * How many characters will be buffered before the AI types once\n * lower = less chance of \`PreventImperson\` working properly\n\n ---\n\n SystemInterval\n * How many messages until \`SystemExperiments alternates\`\n\n ---\n\n Other settings\n * https://gitgud.io/ahsk/clewd/#defaults\n * and\n * https://gitgud.io/ahsk/clewd/-/blob/master/CHANGELOG.md\n */`.trim().replace(/((?<!\r)\n|\r(?!\n))/g, '\r\n'));
     if (firstRun) {
