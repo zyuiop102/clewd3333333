@@ -101,19 +101,22 @@ const simpletokenizer = (str) => {
         assistantIndex != -1 && (content = content.slice(0, assistantIndex) + '\n\n<plot>' + content.slice(assistantIndex));
     }
 
+    //xmlPlot2,以PlainPrompt替换最后的Human
+    segcontentHuman = content.split('\n\nHuman:');
+    let segcontentlastIndex = segcontentHuman.length - 1;
+    if (segcontentlastIndex >= 2 && segcontentHuman[segcontentlastIndex].includes('<!-- Plain Prompt Mode On -->') && !content.includes('\n\nPlainPrompt:')) {
+        content = segcontentHuman.slice(0, segcontentlastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + segcontentHuman.slice(segcontentlastIndex).join('\n\nHuman:');
+        content = content.replace(/<\!-- Plain Prompt Mode On -->/, '');
+    }
+    content = content.replace(/\n\nHuman:.*PlainPrompt:/, '\n\nPlainPrompt:');
+
     //消除空XML tags或多余的\n
     content = content.replace(/(\n)<\/hidden>\n+?<hidden>\n/g, '');
     content = content.replace(/\n<(example|hidden)>\n+?<\/\1>/g, '');
     content = content.replace(/(?<=\n<(card|hidden|example)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
-
-    //xmlPlot2,以PlainPrompt替换最后的Human
-    const altsplitedContent = content.split('\n\nHuman:');
-    if (altsplitedContent.length >= 3 && Config.Settings.xmlPlot === 2 && !content.includes('\n\nPlainPrompt:')) {
-        const lastIndex = altsplitedContent.length - 1;
-        content = altsplitedContent.slice(0, lastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + altsplitedContent.slice(lastIndex).join('\n\nHuman:');
-    }
+    content = content.replace(/\s*$/, '');
 
     return content;
 };
@@ -308,7 +311,7 @@ const updateParams = res => {
     }), conversations = await convRes.json();
     updateParams(convRes);
 /**************************** */
-    if (Config.Cookiecounter === -1 && currentIndex) {
+    if (Config.Cookiecounter === -1) {
         Conversation.uuid = randomUUID().toString();
         const res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
             headers: {
@@ -324,15 +327,15 @@ const updateParams = res => {
         if (res.status === 403 && Config.CookieArray.length > 0) {
             Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
             (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-            currentIndex -= 1;
-        }
-        if (currentIndex === Config.CookieArray.length - 1) {
-            console.log(`\n\n※※※※※※※※※※※※※※※※※※\n※※※Cookie cleanup completed※※※\n※※※※※※※※※※※※※※※※※※\n\n`);
-            process.exit();
+            currentIndex && (currentIndex -= 1);
         }
         changetime += 1;
         let percentage = (changetime / totaltime) * 100;
         console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex}\nstatus: ${res.status}`);
+        if (currentIndex === 0) {
+            console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
+            process.exit();
+        }
         return CookieChanger.emit('ChangeCookie');
     }
 /**************************** */
