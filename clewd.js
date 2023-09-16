@@ -311,27 +311,28 @@ const updateParams = res => {
     }), conversations = await convRes.json();
     updateParams(convRes);
 /**************************** */
+    Conversation.uuid = randomUUID().toString();
+    const res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
+        headers: {
+            ...AI.hdr(),
+            Cookie: getCookies()
+        },
+        method: 'POST',
+        body: JSON.stringify({
+            uuid: Conversation.uuid,
+            name: ''
+        })
+    });
+    if (res.status === 403 && Config.CookieArray.length > 0) {
+        Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
+        (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
+        currentIndex && (currentIndex -= 1);
+        if (Config.Cookiecounter !== -1) {return CookieChanger.emit('ChangeCookie');}
+    }
     if (Config.Cookiecounter === -1) {
-        Conversation.uuid = randomUUID().toString();
-        const res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
-            headers: {
-                ...AI.hdr(),
-                Cookie: getCookies()
-            },
-            method: 'POST',
-            body: JSON.stringify({
-                uuid: Conversation.uuid,
-                name: ''
-            })
-        });
-        if (res.status === 403 && Config.CookieArray.length > 0) {
-            Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-            (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-            currentIndex && (currentIndex -= 1);
-        }
         changetime += 1;
         let percentage = (changetime / totaltime) * 100;
-        console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex}\nstatus: ${res.status}`);
+        console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex || Config.CookieArray.length}\nstatus: ${res.status}`);
         if (currentIndex === 0) {
             console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
             process.exit();
