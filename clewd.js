@@ -60,39 +60,42 @@ const simpletokenizer = (str) => {
         return content;
     }
 
-    //格式顺序交换
-    let segcontentHuman = content.split('\n\nHuman:');
-    const processedsegHuman = segcontentHuman.map(seg => {
-        seg = seg.replace(/(\n\nAssistant:.*?)(\n\nxmlPlot:.*)/gs, '$2$1');
-        return seg = seg.replace(/xmlPlot:\s*/gm, '');
-    });
-    content = processedsegHuman.join('\n\nHuman:');
+    //role合并
+    if (!content.includes('<\!-- Merge Disable -->')) {
+        content = content.replace(/\n\nxmlPlot:/g, '\n\nHuman:');
+        content = content.replace(/\n\nHuman:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
+        content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
+    }
+    content = content.replace(/xmlPlot:\s*/gm, '');
+
+    //格式顺序交换&越狱倒置
+    content = content.replace(/<Prev(Assistant|Human)>.*?<\/Prev\1>/gs, function(match) {return match.replace(/\n\n(Assistant|Human):/g, '\n\ntemp$1:')});
     let segcontentAssistant = content.split('\n\nAssistant:');
-    const processedsegAssistant = segcontentAssistant.map(seg => {
-        let processedseg = seg.replace(/(\n\nHuman:.*?)\n\nPrevAssistant:(.*)/gs, '\n\n$2$1');
-        return seg = processedseg.replace(/(.*?)\n\nPrevHuman:(.*$)/gs, ':tnatsissA$2\n\nAssistant:$1');
+    let processedsegAssistant = segcontentAssistant.map(seg => {
+        return seg.replace(/(\n\nHuman:.*?)\n\n<PrevAssistant>(.*?)<\/PrevAssistant>/gs, '\n\n$2$1');
     });
     content = processedsegAssistant.join('\n\nAssistant:');
-    content = content.replace(/Assistant:\s*:tnatsissA\s*/gm, '');
-    content = content.replace(/\n\nTemp(Assistant|Human):/g, '\n\n$1:');
-
-    //越狱倒置
-    segcontentHuman = content.split('\n\nHuman:');
-    const seglength = content.split('\n\nHuman:').length;
-    if (/Assistant: *.$/.test(content) && seglength > 1 && !segcontentHuman[seglength - 2].includes('\n\nAssistant:')) {
-        segcontentHuman[seglength - 2] = segcontentHuman.splice(seglength - 1, 1, segcontentHuman[seglength - 2])[0];
+    let segcontentHuman = content.split('\n\nHuman:');
+    let processedsegHuman = segcontentHuman.map(seg => {
+        return seg.replace(/(\n\nAssistant:.*?)\n\n<PrevHuman>(.*?)<\/PrevHuman>/gs, '\n\n$2$1');
+    });
+    const seglength = processedsegHuman.length;
+    if (/Assistant: *.$/.test(content) && seglength > 1 && !processedsegHuman[seglength - 2].includes('\n\nAssistant:')) {
+        processedsegHuman[seglength - 2] = processedsegHuman.splice(seglength - 1, 1, processedsegHuman[seglength - 2])[0];
     }
-    content = segcontentHuman.join('\n\nHuman:');
+    content = processedsegHuman.join('\n\nHuman:');
+    content = content.replace(/\n\ntemp(Assistant|Human):/g, '\n\n$1:');
 
     //给开头加上</file-attachment-contents>用于截断附加文件标识
     content.includes('<file-attachment-contents>') && (content = '</file-attachment-contents>\n\n' + content);
 
     // 在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>"
     const exampleNote = content.match(/(?<=<example-note>).*(?=<\/example-note>)/) || '';
+    const cardtag = content.match(/(?=\n\n<\/card>)/) || '</card>';
     content = content.replace(/<example-note>.*<\/example-note>/, '');
     const firstChatStart = content.indexOf('\n\n[Start a new');
     const lastChatStart = content.lastIndexOf('\n\n[Start a new');
-    firstChatStart != -1 && (content = content.slice(0, firstChatStart) + `\n\n</card>\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + '\n\n</example>' + content.slice(lastChatStart));
+    firstChatStart != -1 && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + '\n\n</example>' + content.slice(lastChatStart));
     
     // 之后的第一个"Assistant: "之前插入"\n\n<plot>"
     const lastChatIndex = content.lastIndexOf('\n\n[Start a new');
@@ -106,7 +109,7 @@ const simpletokenizer = (str) => {
     let segcontentlastIndex = segcontentHuman.length - 1;
     if (segcontentlastIndex >= 2 && segcontentHuman[segcontentlastIndex].includes('<!-- Plain Prompt Mode On -->') && !content.includes('\n\nPlainPrompt:')) {
         content = segcontentHuman.slice(0, segcontentlastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + segcontentHuman.slice(segcontentlastIndex).join('\n\nHuman:');
-        content = content.replace(/<\!-- Plain Prompt Mode On -->/, '');
+        content = content.replace(/<\!-- Plain Prompt Enable -->/, '');
     }
     content = content.replace(/\n\nHuman:.*PlainPrompt:/, '\n\nPlainPrompt:');
 
@@ -311,7 +314,7 @@ const updateParams = res => {
     }), conversations = await convRes.json();
     updateParams(convRes);
     conversations.length > 0 && await Promise.all(conversations.map((conv => deleteChat(conv.uuid))));
-/***************************** */    
+/***************************** */
     const tempuuid = randomUUID().toString();
     const res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
         headers: {
@@ -339,8 +342,8 @@ const updateParams = res => {
             process.exit();
         }
         return CookieChanger.emit('ChangeCookie');
-/***************************** */        
     }
+/***************************** */
 }, writeSettings = async (config, firstRun = false) => {
     write(ConfigPath, `/*\n* https://rentry.org/teralomaniac_clewd\n* https://github.com/teralomaniac/clewd\n*/\n\n// SET YOUR COOKIE BELOW\n\nmodule.exports = ${JSON.stringify(config, null, 4)}\n\n/*\n BufferSize\n * How many characters will be buffered before the AI types once\n * lower = less chance of \`PreventImperson\` working properly\n\n ---\n\n SystemInterval\n * How many messages until \`SystemExperiments alternates\`\n\n ---\n\n Other settings\n * https://gitgud.io/ahsk/clewd/#defaults\n * and\n * https://gitgud.io/ahsk/clewd/-/blob/master/CHANGELOG.md\n */`.trim().replace(/((?<!\r)\n|\r(?!\n))/g, '\r\n'));
     if (firstRun) {
@@ -592,7 +595,8 @@ const updateParams = res => {
                             }
                             let spacing = '';
                             idx > 0 && (spacing = '\n\n'); //idx > 0 && (spacing = systemMessages.includes(message) ? '\n' : '\n\n');
-                            const prefix = message.customname ? message.name + ': ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
+                            //const prefix = message.customname ? message.name + ': ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
+                            const prefix = message.customname ? message.role + ': <customname>' + message.name + '</customname>: ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
                             return `${spacing}${message.strip ? '' : prefix}${'system' === message.role ? message.content : message.content.trim()}`;
                         }));
                         return {
@@ -604,6 +608,7 @@ const updateParams = res => {
                     'R' !== type || prompt || (prompt = '...regen...');
 /****************************************************************/
                     Config.Settings.xmlPlot && (prompt = AddxmlPlot(prompt));
+                    prompt = prompt.replace(/<customname>(.*?)<\/customname>/gm, '$1');
                     Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?|[Ss]ystem)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padJson(prompt));
 /****************************************************************/
@@ -791,6 +796,7 @@ const updateParams = res => {
         }
     }
     Config.CookieArray = uniqueArr;
+    (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
     Config.Cookiecounter !== -1 && (currentIndex = Math.floor(Math.random() * Config.CookieArray.length));
 /***************************** */
     Proxy.listen(Config.Port, Config.Ip, onListen);
