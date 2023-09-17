@@ -66,25 +66,29 @@ const simpletokenizer = (str) => {
         content = content.replace(/\n\nHuman:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
         content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
     }
-    content = content.replace(/xmlPlot:\s*/gm, '');
+    content = content.replace(/\n\nxmlPlot:\s*/gm, '\n\n');
     content = content.replace(/<\!-- Merge Disable -->/gm, '');
 
     //格式顺序交换&越狱倒置
     content = content.replace(/<Prev(Assistant|Human)>.*?<\/Prev\1>/gs, function(match) {return match.replace(/\n\n(Assistant|Human):/g, '\n\ntemp$1:')});
     let segcontentAssistant = content.split('\n\nAssistant:');
     let processedsegAssistant = segcontentAssistant.map(seg => {
-        return seg.replace(/(\n\nHuman:.*?)\n\n<PrevAssistant>(.*?)<\/PrevAssistant>/gs, '\n\n$2$1');
+        return seg.replace(/(\n\nHuman:.*?)<PrevAssistant>(.*?)<\/PrevAssistant>/gs, '\n\n$2$1');
     });
     content = processedsegAssistant.join('\n\nAssistant:');
     let segcontentHuman = content.split('\n\nHuman:');
-    let processedsegHuman = segcontentHuman.map(seg => {
-        return seg.replace(/(\n\nAssistant:.*?)\n\n<PrevHuman>(.*?)<\/PrevHuman>/gs, '\n\n$2$1');
-    });
-    const seglength = processedsegHuman.length;
-    if (/Assistant: *.$/.test(content) && seglength > 1 && !processedsegHuman[seglength - 2].includes('\n\nAssistant:')) {
-        processedsegHuman[seglength - 2] = processedsegHuman.splice(seglength - 1, 1, processedsegHuman[seglength - 2])[0];
+    const seglength = segcontentHuman.length;
+    for (let i = 1; i < seglength; i++) {
+        const match = segcontentHuman[i].match(/<PrevHuman>.*?<\/PrevHuman>/s);
+        if (match) {
+            segcontentHuman[i - 1] += match[0].replace(/<PrevHuman>(.*?)<\/PrevHuman>/s, '\n\n$1');
+            segcontentHuman[i] = segcontentHuman[i].replace(match[0], '');
+        }
     }
-    content = processedsegHuman.join('\n\nHuman:');
+    if (/Assistant: *.$/.test(content) && seglength > 1 && !segcontentHuman[seglength - 2].includes('\n\nAssistant:')) {
+        segcontentHuman[seglength - 2] = segcontentHuman.splice(seglength - 1, 1, segcontentHuman[seglength - 2])[0];
+    }
+    content = segcontentHuman.join('\n\nHuman:');
     content = content.replace(/\n\ntemp(Assistant|Human):/g, '\n\n$1:');
 
     //给开头加上</file-attachment-contents>用于截断附加文件标识
@@ -108,7 +112,7 @@ const simpletokenizer = (str) => {
     //Plain Prompt
     segcontentHuman = content.split('\n\nHuman:');
     let segcontentlastIndex = segcontentHuman.length - 1;
-    if (segcontentlastIndex >= 2 && segcontentHuman[segcontentlastIndex].includes('<!-- Plain Prompt Mode On -->') && !content.includes('\n\nPlainPrompt:')) {
+    if (segcontentlastIndex >= 2 && segcontentHuman[segcontentlastIndex].includes('<!-- Plain Prompt Enable -->') && !content.includes('\n\nPlainPrompt:')) {
         content = segcontentHuman.slice(0, segcontentlastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + segcontentHuman.slice(segcontentlastIndex).join('\n\nHuman:');
         content = content.replace(/<\!-- Plain Prompt Enable -->/, '');
     }
