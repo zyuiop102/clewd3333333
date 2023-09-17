@@ -67,6 +67,7 @@ const simpletokenizer = (str) => {
         content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
     }
     content = content.replace(/xmlPlot:\s*/gm, '');
+    content = content.replace(/<\!-- Merge Disable -->/gm, '');
 
     //格式顺序交换&越狱倒置
     content = content.replace(/<Prev(Assistant|Human)>.*?<\/Prev\1>/gs, function(match) {return match.replace(/\n\n(Assistant|Human):/g, '\n\ntemp$1:')});
