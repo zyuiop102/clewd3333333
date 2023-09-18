@@ -146,6 +146,7 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
     Cookie: '',
     CookieArray: [],
     Cookiecounter: 0,
+    CookieIndex: -1,
     Ip: process.env.PORT ? '0.0.0.0' : '127.0.0.1',
     Port: process.env.PORT || 8444,
     localtunnel: false,
@@ -240,13 +241,13 @@ const updateParams = res => {
                 console.log(`\nTunnel URL for outer websites: ${tunnel.url}/v1\n`);
             })
         }
-        totaltime = Config.CookieArray.length;
+        totaltime = Config.CookieArray.length - currentIndex;
     }
     if (Config.CookieArray?.length > 0) {
         Config.Cookie = Config.CookieArray[currentIndex];
         currentIndex = (currentIndex + 1) % Config.CookieArray.length;
     }
-    Config.Cookiecounter === -1 && (changetime += 1);
+    Config.Cookiecounter < 0 && (changetime += 1);
 /***************************** */
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
         throw Error('Set your cookie inside config.js');
@@ -343,22 +344,19 @@ const updateParams = res => {
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
         currentIndex && (currentIndex -= 1);
-        if (Config.Cookiecounter !== -1) { 
+        if (Config.Cookiecounter >= 0) { 
             CookieChanger.emit('ChangeCookie');
             return;
         }
     }
-    if (Config.Cookiecounter === -1) {
+    if (Config.Cookiecounter < 0) {
         let percentage = (changetime / totaltime) * 100;
         console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex || Config.CookieArray.length}\nstatus: ${res.status}`);
         if (percentage == 100) {
             console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
             process.exit();
         }
-        if (res.status === 404) {
-            console.log(`\n\n※※※Rate Limited Error※※※\n\n`);
-            process.exit();
-        }
+        Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         return CookieChanger.emit('ChangeCookie');
     }
 /***************************** */
@@ -821,7 +819,7 @@ const updateParams = res => {
     }
     Config.CookieArray = uniqueArr;
     (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-    Config.Cookiecounter !== -1 && (currentIndex = Math.floor(Math.random() * Config.CookieArray.length));
+    Config.Cookiecounter >= 0 && (currentIndex = Config.CookieIndex >= 0 ? Config.CookieIndex : Math.floor(Math.random()*Config.CookieArray.length));
 /***************************** */
     Proxy.listen(Config.Port, Config.Ip, onListen);
     Proxy.on('error', (err => {
