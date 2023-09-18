@@ -350,7 +350,7 @@ const updateParams = res => {
         }
     }
     if (Config.Cookiecounter < 0) {
-        let percentage = (changetime + Config.CookieIndex / totaltime) * 100;
+        let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100;
         console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex || Config.CookieArray.length}\nstatus: ${res.status}`);
         if (percentage == 100) {
             console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
