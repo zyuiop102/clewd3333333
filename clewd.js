@@ -62,12 +62,16 @@ const simpletokenizer = (str) => {
 
     //role合并
     if (!content.includes('<\!-- Merge Disable -->')) {
-        content = content.replace(/\n\nxmlPlot:/g, '\n\nHuman:');
-        content = content.replace(/\n\nHuman:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
-        content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
+        if (!content.includes('<\!-- Merge Human Disable -->')) {
+            content = content.replace(/\n\nxmlPlot:/g, '\n\nHuman:');
+            content = content.replace(/\n\nHuman:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
+        }
+        if (!content.includes('<\!-- Merge Assistant Disable -->')) {
+            content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
+        }
     }
     content = content.replace(/\n\nxmlPlot:\s*/gm, '\n\n');
-    content = content.replace(/<\!-- Merge Disable -->/gm, '');
+    content = content.replace(/<\!-- Merge.*?Disable -->/gm, '');
 
     //格式顺序交换&越狱倒置
     content = content.replace(/<Prev(Assistant|Human)>.*?<\/Prev\1>/gs, function(match) {return match.replace(/\n\n(Assistant|Human):/g, '\n\ntemp$1:')});
@@ -242,6 +246,7 @@ const updateParams = res => {
         Config.Cookie = Config.CookieArray[currentIndex];
         currentIndex = (currentIndex + 1) % Config.CookieArray.length;
     }
+    Config.Cookiecounter === -1 && (changetime += 1);
 /***************************** */
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
         throw Error('Set your cookie inside config.js');
@@ -261,7 +266,8 @@ const updateParams = res => {
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
         currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
-        return CookieChanger.emit('ChangeCookie');
+        CookieChanger.emit('ChangeCookie');
+        return;
     }
 /**************************** */
     await checkResErr(accRes);
@@ -308,6 +314,7 @@ const updateParams = res => {
         })(flag.type))));
 /***************************** */
         Config.CookieArray?.length > 0 && CookieChanger.emit('ChangeCookie');
+        return;
 /***************************** */
     }
     const convRes = await fetch(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
@@ -336,14 +343,20 @@ const updateParams = res => {
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
         currentIndex && (currentIndex -= 1);
-        if (Config.Cookiecounter !== -1) {return CookieChanger.emit('ChangeCookie');}
+        if (Config.Cookiecounter !== -1) { 
+            CookieChanger.emit('ChangeCookie');
+            return;
+        }
     }
     if (Config.Cookiecounter === -1) {
-        changetime += 1;
         let percentage = (changetime / totaltime) * 100;
         console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex || Config.CookieArray.length}\nstatus: ${res.status}`);
-        if (currentIndex === 0) {
+        if (percentage == 100) {
             console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
+            process.exit();
+        }
+        if (res.status === 404) {
+            console.log(`\n\n※※※Rate Limited Error※※※\n\n`);
             process.exit();
         }
         return CookieChanger.emit('ChangeCookie');
@@ -782,7 +795,7 @@ const updateParams = res => {
         function convertToType(value) {
             if (value === "true") return true;
             if (value === "false") return false;
-            if (/^\d+$/.test(value)) return parseInt(value, 10);
+            if (/^\d+$/.test(value)) return parseInt(value);
             return value;
         }
         for (let key in Config) {
