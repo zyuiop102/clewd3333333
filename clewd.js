@@ -241,7 +241,7 @@ const updateParams = res => {
                 console.log(`\nTunnel URL for outer websites: ${tunnel.url}/v1\n`);
             })
         }
-        totaltime = Config.CookieArray.length - currentIndex;
+        totaltime = Config.CookieArray.length;
     }
     if (Config.CookieArray?.length > 0) {
         Config.Cookie = Config.CookieArray[currentIndex];
@@ -350,7 +350,7 @@ const updateParams = res => {
         }
     }
     if (Config.Cookiecounter < 0) {
-        let percentage = (changetime / totaltime) * 100;
+        let percentage = (changetime + Config.CookieIndex / totaltime) * 100;
         console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex || Config.CookieArray.length}\nstatus: ${res.status}`);
         if (percentage == 100) {
             console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
@@ -818,8 +818,7 @@ const updateParams = res => {
     }
     Config.CookieArray = uniqueArr;
     (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-    Config.Cookiecounter >= 0 && (currentIndex = Math.floor(Math.random()*Config.CookieArray.length));
-    Config.CookieIndex >= 0  && (currentIndex = Config.CookieIndex);
+    currentIndex = Config.CookieIndex >= 0 ? Config.CookieIndex : Config.Cookiecounter >= 0 ? Math.floor(Math.random()*Config.CookieArray.length) : 0;
 /***************************** */
     Proxy.listen(Config.Port, Config.Ip, onListen);
     Proxy.on('error', (err => {
