@@ -1056,13 +1056,19 @@ const Proxy = Server((async (req, res) => {
             writeSettings(Config, true);
         }
 /***************************** */
+        function convertToType(value) {
+            if (value === "true") return true;
+            if (value === "false") return false;
+            if (/^\d+$/.test(value)) return parseInt(value, 10);
+            return value;
+        }
         for (let key in Config) {
             if (key === 'Settings') {
                 for (let setting in Config.Settings) {
-                    Config.Settings[setting] = process.env[setting] ?? Config.Settings[setting];
+                    Config.Settings[setting] = convertToType(process.env[setting]) ?? Config.Settings[setting];
                 }
             } else {
-                Config[key] = key === 'CookieArray' ? (process.env[key]?.split(',') ?? Config[key]) : (process.env[key] ?? Config[key]);
+                Config[key] = key === 'CookieArray' ? (process.env[key]?.split(',')?.map(x => x.replace(/[\[\]"\s]/g, '')) ?? Config[key]) : (convertToType(process.env[key]) ?? Config[key]);
             }
         }
 /***************************** */
