@@ -356,7 +356,6 @@ const updateParams = res => {
             console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
             process.exit();
         }
-        Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         return CookieChanger.emit('ChangeCookie');
     }
 /***************************** */
@@ -819,7 +818,8 @@ const updateParams = res => {
     }
     Config.CookieArray = uniqueArr;
     (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-    Config.Cookiecounter >= 0 && (currentIndex = Config.CookieIndex >= 0 ? Config.CookieIndex : Math.floor(Math.random()*Config.CookieArray.length));
+    Config.Cookiecounter >= 0 && (currentIndex = Math.floor(Math.random()*Config.CookieArray.length));
+    Config.CookieIndex >= 0  && (currentIndex = Config.CookieIndex);
 /***************************** */
     Proxy.listen(Config.Port, Config.Ip, onListen);
     Proxy.on('error', (err => {
