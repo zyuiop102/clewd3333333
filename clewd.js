@@ -316,18 +316,7 @@ const updateParams = res => {
 /***************************** */
         Config.CookieArray?.length > 0 && CookieChanger.emit('ChangeCookie');
         return;
-/***************************** */
     }
-    const convRes = await fetch(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
-        method: 'GET',
-        headers: {
-            ...AI.hdr(),
-            Cookie: getCookies()
-        }
-    }), conversations = await convRes.json();
-    updateParams(convRes);
-    conversations.length > 0 && await Promise.all(conversations.map((conv => deleteChat(conv.uuid))));
-/***************************** */
     const tempuuid = randomUUID().toString();
     const res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
         headers: {
@@ -357,8 +346,17 @@ const updateParams = res => {
             process.exit();
         }
         return CookieChanger.emit('ChangeCookie');
+/***************************** */        
     }
-/***************************** */
+    const convRes = await fetch(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
+        method: 'GET',
+        headers: {
+            ...AI.hdr(),
+            Cookie: getCookies()
+        }
+    }), conversations = await convRes.json();
+    updateParams(convRes);
+    conversations.length > 0 && await Promise.all(conversations.map((conv => deleteChat(conv.uuid))));
 }, writeSettings = async (config, firstRun = false) => {
     write(ConfigPath, `/*\n* https://rentry.org/teralomaniac_clewd\n* https://github.com/teralomaniac/clewd\n*/\n\n// SET YOUR COOKIE BELOW\n\nmodule.exports = ${JSON.stringify(config, null, 4)}\n\n/*\n BufferSize\n * How many characters will be buffered before the AI types once\n * lower = less chance of \`PreventImperson\` working properly\n\n ---\n\n SystemInterval\n * How many messages until \`SystemExperiments alternates\`\n\n ---\n\n Other settings\n * https://gitgud.io/ahsk/clewd/#defaults\n * and\n * https://gitgud.io/ahsk/clewd/-/blob/master/CHANGELOG.md\n */`.trim().replace(/((?<!\r)\n|\r(?!\n))/g, '\r\n'));
     if (firstRun) {
