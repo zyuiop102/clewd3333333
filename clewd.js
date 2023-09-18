@@ -345,8 +345,9 @@ const updateParams = res => {
             console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
             process.exit();
         }
-        return CookieChanger.emit('ChangeCookie');
-/***************************** */        
+        CookieChanger.emit('ChangeCookie');
+        return;
+/***************************** */
     }
     const convRes = await fetch(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
         method: 'GET',
