@@ -267,7 +267,7 @@ const updateParams = res => {
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
         currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
-        console.log(`[36mExpired![0m`);
+        console.log(`[31mExpired![0m`);
         CookieChanger.emit('ChangeCookie');
         return;
     }
@@ -289,10 +289,10 @@ const updateParams = res => {
     uuidOrg = accInfo?.uuid;
 /************************* */ 
     if (uuidOrgArray.includes(uuidOrg)) {
-        console.log(`[36mOverlap![0m`);
+        console.log(`[35mOverlap![0m`);
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-        currentIndex && (currentIndex -= 1);
+        currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
         CookieChanger.emit('ChangeCookie');
         return;
     } else {
@@ -327,7 +327,7 @@ const updateParams = res => {
             console.log(`${type}: ${json.error ? json.error.message || json.error.type || json.detail : 'OK'}`);
         })(flag.type))));
 /***************************** */
-        console.log(`[35mRestricted! index: ${currentIndex}[0m`);
+        console.log(`[35mRestricted![0m\nindex: [36m${currentIndex}[0m`);
         Config.CookieArray?.length > 0 && CookieChanger.emit('ChangeCookie');
         return;
     }
@@ -343,17 +343,18 @@ const updateParams = res => {
         if (accountinfo.includes('\\"completed_verification_at\\":null')) {
             Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
             (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-            currentIndex && (currentIndex -= 1);
-            console.log(`[31m403! index: ${currentIndex + 1}[0m`);
+            currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
+            console.log(`[31mUnverified![0m`);
             changer = true;
         }
-        if (accountinfo.includes('\\"messageLimit\\":{\\"type\\":\\"approaching_limit\\",\\"remaining\\":0,')) {
-            console.log(`[31m429! index: ${currentIndex + 1}[0m`);
+        if (accountinfo.includes('\\"messageLimit\\":{\\"type\\":\\"approaching_limit\\",\\"remaining\\":0,') || accountinfo.includes('\\"messageLimit\\":{\\"type\\":\\"exceeded_limit\\",')) {
+            console.log(`[35mExceeded limit![0m`);
+            Config.Cookiecounter >= 0 && console.log(`index: [36m${currentIndex}[0m`);
             changer = true;
         }
         if (Config.Cookiecounter < 0) {
             let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100;
-            console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [35m${currentIndex || Config.CookieArray.length}[0m`);
+            console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
             if (percentage == 100) {
                 console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
                 process.exit();
@@ -730,7 +731,7 @@ const updateParams = res => {
                     setTitle('ok ' + bytesToSize(clewdStream.size));
                     console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
 /******************************** */
-                    200 !== fetchAPI.status && console.log(`[35mindex: ${currentIndex}[0m\n`);
+                    200 !== fetchAPI.status && console.log(`index: [36m${currentIndex}[0m\n`);
                     if (clewdStream.readonly) {
                         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
                         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
