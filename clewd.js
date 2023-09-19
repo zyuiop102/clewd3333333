@@ -247,7 +247,7 @@ const updateParams = res => {
         Config.Cookie = Config.CookieArray[currentIndex];
         currentIndex = (currentIndex + 1) % Config.CookieArray.length;
         if (uuidOrgArray.includes(uuidOrg)) {
-            console.log(`[36mOverlap!`);
+            console.log(`[36mOverlap![0m`);
             CookieChanger.emit('ChangeCookie');
             return;
         } else {
