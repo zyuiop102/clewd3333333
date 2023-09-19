@@ -246,13 +246,6 @@ const updateParams = res => {
     if (Config.CookieArray?.length > 0) {
         Config.Cookie = Config.CookieArray[currentIndex];
         currentIndex = (currentIndex + 1) % Config.CookieArray.length;
-        if (uuidOrgArray.includes(uuidOrg)) {
-            console.log(`[36mOverlap![0m`);
-            CookieChanger.emit('ChangeCookie');
-            return;
-        } else {
-            uuidOrgArray.push(uuidOrg);
-        }
         Config.Cookiecounter < 0 && (changetime += 1);
     }
 /***************************** */
@@ -293,6 +286,15 @@ const updateParams = res => {
         capabilities: accInfo.capabilities
     });
     uuidOrg = accInfo?.uuid;
+/************************* */ 
+    if (uuidOrgArray.includes(uuidOrg)) {
+        console.log(`[36mOverlap![0m`);
+        CookieChanger.emit('ChangeCookie');
+        return;
+    } else {
+        uuidOrgArray.push(uuidOrg);
+    }
+/************************* */    
     if (accInfo?.active_flags.length > 0) {
         const now = new Date, formattedFlags = accInfo.active_flags.map((flag => {
             const days = ((new Date(flag.expires_at).getTime() - now.getTime()) / 864e5).toFixed(2);
