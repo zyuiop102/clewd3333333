@@ -267,6 +267,7 @@ const updateParams = res => {
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
         currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
+        console.log(`[36mExpired![0m`);
         CookieChanger.emit('ChangeCookie');
         return;
     }
@@ -326,7 +327,7 @@ const updateParams = res => {
             console.log(`${type}: ${json.error ? json.error.message || json.error.type || json.detail : 'OK'}`);
         })(flag.type))));
 /***************************** */
-        console.log(`[35m403! index: ${currentIndex}[0m`);
+        console.log(`[35mRestricted! index: ${currentIndex}[0m`);
         Config.CookieArray?.length > 0 && CookieChanger.emit('ChangeCookie');
         return;
     }
