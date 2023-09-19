@@ -70,7 +70,7 @@ const simpletokenizer = (str) => {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
         }
     }
-    content = content.replace(/\n\nxmlPlot:\s*/gm, '\n\n');
+    content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '\n\n');
     content = content.replace(/<\!-- Merge.*?Disable -->/gm, '');
 
     //格式顺序交换&越狱倒置
@@ -128,7 +128,7 @@ const simpletokenizer = (str) => {
     content = content.replace(/(?<=\n<(card|hidden|example)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
-    content = content.replace(/\s*$/, '');
+    content = content.replace(/^\s*|\s*$/g, '');
 
     return content;
 };
@@ -347,7 +347,7 @@ const updateParams = res => {
             console.log(`[31mUnverified![0m`);
             changer = true;
         }
-        if (accountinfo.includes('\\"messageLimit\\":{\\"type\\":\\"approaching_limit\\",\\"remaining\\":0,') || accountinfo.includes('\\"messageLimit\\":{\\"type\\":\\"exceeded_limit\\",')) {
+        if (/\\"messageLimit\\":{\\"type\\":\\"(approaching_limit\\",\\"remaining\\":0|exceeded_limit)\\",/.test(accountinfo)) {
             console.log(`[35mExceeded limit![0m`);
             Config.Cookiecounter >= 0 && console.log(`index: [36m${currentIndex}[0m`);
             changer = true;
