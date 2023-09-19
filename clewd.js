@@ -7,7 +7,7 @@
 const {createServer: Server, IncomingMessage, ServerResponse} = require('node:http'), {createHash: Hash, randomUUID, randomInt, randomBytes} = require('node:crypto'), {TransformStream, ReadableStream} = require('node:stream/web'), {Readable, Writable} = require('node:stream'), {Blob} = require('node:buffer'), {existsSync: exists, writeFileSync: write, createWriteStream} = require('node:fs'), {join: joinP} = require('node:path'), {ClewdSuperfetch: Superfetch, SuperfetchAvailable} = require('./lib/clewd-superfetch'), {AI, fileName, genericFixes, bytesToSize, setTitle, checkResErr, Replacements, Main, fetch429} = require('./lib/clewd-utils'), ClewdStream = require('./lib/clewd-stream');
 
 /******************************************************* */
-let currentIndex = 0, Firstlogin = true, changeflag = 0, changetime = 0, totaltime = 0;
+let currentIndex = 0, Firstlogin = true, changeflag = 0, changetime = 0, totaltime = 0, uuidOrgArray = [];
 
 const events = require('events'), CookieChanger = new events.EventEmitter();
 
@@ -146,7 +146,7 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
     Cookie: '',
     CookieArray: [],
     Cookiecounter: 0,
-    CookieIndex: -1,
+    CookieIndex: 0,
     Ip: process.env.PORT ? '0.0.0.0' : '127.0.0.1',
     Port: process.env.PORT || 8444,
     localtunnel: false,
@@ -246,8 +246,15 @@ const updateParams = res => {
     if (Config.CookieArray?.length > 0) {
         Config.Cookie = Config.CookieArray[currentIndex];
         currentIndex = (currentIndex + 1) % Config.CookieArray.length;
+        if (uuidOrgArray.includes(uuidOrg)) {
+            console.log(`[36mOverlap!`);
+            CookieChanger.emit('ChangeCookie');
+            return;
+        } else {
+            uuidOrgArray.push(uuidOrg);
+        }
+        Config.Cookiecounter < 0 && (changetime += 1);
     }
-    Config.Cookiecounter < 0 && (changetime += 1);
 /***************************** */
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
         throw Error('Set your cookie inside config.js');
@@ -314,39 +321,43 @@ const updateParams = res => {
             console.log(`${type}: ${json.error ? json.error.message || json.error.type || json.detail : 'OK'}`);
         })(flag.type))));
 /***************************** */
+        console.log(`[35m403! index: ${currentIndex}[0m`);
         Config.CookieArray?.length > 0 && CookieChanger.emit('ChangeCookie');
         return;
     }
-    const tempuuid = randomUUID().toString();
-    const res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
-        headers: {
-            ...AI.hdr(),
-            Cookie: getCookies()
-        },
-        method: 'POST',
-        body: JSON.stringify({
-            uuid: tempuuid,
-            name: ''
-        })
-    });
-    if (res.status === 403 && Config.CookieArray.length > 0) {
-        Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-        (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-        currentIndex && (currentIndex -= 1);
-        if (Config.Cookiecounter >= 0) { 
+    if (Config.CookieArray.length > 0) {
+        let changer = false;
+        const res = await fetch(`${Config.rProxy}`, {
+            headers: {
+                ...AI.hdr(),
+                Cookie: getCookies()
+            },
+            method: 'GET'
+        }), accountinfo = await res.text();
+        if (accountinfo.includes('\\"completed_verification_at\\":null')) {
+            Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
+            (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
+            currentIndex && (currentIndex -= 1);
+            console.log(`[31m403! index: ${currentIndex + 1}[0m`);
+            changer = true;
+        }
+        if (accountinfo.includes('\\"messageLimit\\":{\\"type\\":\\"approaching_limit\\",\\"remaining\\":0,')) {
+            console.log(`[31m429! index: ${currentIndex + 1}[0m`);
+            changer = true;
+        }
+        if (Config.Cookiecounter < 0) {
+            let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100;
+            console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [35m${currentIndex || Config.CookieArray.length}[0m`);
+            if (percentage == 100) {
+                console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
+                process.exit();
+            }
+            changer = true;
+        }
+        if (changer) {
             CookieChanger.emit('ChangeCookie');
             return;
         }
-    }
-    if (Config.Cookiecounter < 0) {
-        let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100;
-        console.log(`progress: ${percentage.toFixed(2)}%\nlength: ${Config.CookieArray.length}\nindex: ${currentIndex || Config.CookieArray.length}\nstatus: ${res.status}`);
-        if (percentage == 100) {
-            console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
-            process.exit();
-        }
-        CookieChanger.emit('ChangeCookie');
-        return;
 /***************************** */
     }
     const convRes = await fetch(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
@@ -385,6 +396,9 @@ const updateParams = res => {
 
       case '/v1/chat/completions':
         ((req, res) => {
+/******************************** */
+            let superfetch429 = false;
+/******************************** */
             setTitle('recv...');
             let fetchAPI;
             const abortControl = new AbortController, {signal} = abortControl;
@@ -703,16 +717,14 @@ const updateParams = res => {
                         });
                     }
                 }
-                clearInterval(titleTimer);
-/******************************** */
-                fetch429 && CookieChanger.emit('ChangeCookie');
-/******************************** */                
+                clearInterval(titleTimer);              
                 if (clewdStream) {
                     clewdStream.censored && console.warn('[33mlikely your account is hard-censored[0m');
                     prevImpersonated = clewdStream.impersonated;
                     setTitle('ok ' + bytesToSize(clewdStream.size));
                     console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
 /******************************** */
+                    200 !== fetchAPI.status && console.log(`[35mindex: ${currentIndex}[0m\n`);
                     if (clewdStream.readonly) {
                         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
                         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
@@ -721,7 +733,7 @@ const updateParams = res => {
                     changeflag += 1;
                     if (Config.CookieArray?.length > 0 && (clewdStream.cookiechange || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
                         changeflag = 0;
-                        CookieChanger.emit('ChangeCookie');
+                        superfetch429 = true;
                     }
 /******************************** */
                     clewdStream.empty();
@@ -731,6 +743,9 @@ const updateParams = res => {
                         await deleteChat(Conversation.uuid);
                     } catch (err) {}
                 }
+/******************************** */
+                (fetch429 || superfetch429) && CookieChanger.emit('ChangeCookie');
+/******************************** */
             }));
         })(req, res);
         break;
@@ -817,7 +832,7 @@ const updateParams = res => {
     }
     Config.CookieArray = uniqueArr;
     (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-    currentIndex = Config.CookieIndex >= 0 ? Config.CookieIndex : Config.Cookiecounter >= 0 ? Math.floor(Math.random()*Config.CookieArray.length) : 0;
+    currentIndex = Config.CookieIndex > 0 ? Config.CookieIndex - 1 : Config.Cookiecounter >= 0 ? Math.floor(Math.random()*Config.CookieArray.length) : 0;
 /***************************** */
     Proxy.listen(Config.Port, Config.Ip, onListen);
     Proxy.on('error', (err => {
