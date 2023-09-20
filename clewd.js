@@ -64,8 +64,9 @@ const simpletokenizer = (str) => {
     //role合并
     if (!content.includes('<\!-- Merge Disable -->')) {
         if (!content.includes('<\!-- Merge Human Disable -->')) {
-            content = content.replace(/\n\nxmlPlot:/g, '\n\nHuman:');
-            content = content.replace(/\n\nHuman:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
+            content = content.replace(/(\n\n|^)xmlPlot:/g, '$1Human:');
+            content = content.replace(/(?:\n\n|^)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
+            content = content.replace(/^\s*Human:\s*/, '');
         }
         if (!content.includes('<\!-- Merge Assistant Disable -->')) {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
@@ -130,7 +131,7 @@ const simpletokenizer = (str) => {
     content = content.replace(/(?<=\n<(card|hidden|example)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
-    content = content.replace(/^\s*|\s*$/g, '');
+    content = content.trim();
 
     return content;
 };
