@@ -248,6 +248,11 @@ const updateParams = res => {
         currentIndex = (currentIndex + 1) % Config.CookieArray.length;
         changetime += 1;
     }
+    let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100
+    if (percentage > 100) {
+        console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
+        return process.exit();
+    }
 /***************************** */
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
         throw Error('Set your cookie inside config.js');
@@ -263,11 +268,12 @@ const updateParams = res => {
         }
     });
 /**************************** */
-    if (accRes.statusText === 'Forbidden' && Config.CookieArray.length > 0) {
+    if (accRes.statusText === 'Forbidden' && Config.CookieArray?.length > 0) {
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-        currentIndex = (currentIndex - 1) % Config.CookieArray.length;
+        currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
         console.log(`[31mExpired![0m`);
+        Config.Cookiecounter < 0 && console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
         CookieChanger.emit('ChangeCookie');
         return;
     }
@@ -288,19 +294,12 @@ const updateParams = res => {
     });
     uuidOrg = accInfo?.uuid;
 /************************* */
-    let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100
     if (uuidOrgArray.includes(uuidOrg)) {
         console.log(`[35mOverlap![0m`);
-        if (Config.Cookiecounter < 0) {
-            console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
-            if (percentage >= 100) {
-                console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
-                return process.exit();
-            }
-        }
+        currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
+        Config.Cookiecounter < 0 && console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-        currentIndex = (currentIndex - 1) % Config.CookieArray.length;
         CookieChanger.emit('ChangeCookie');
         return;
     } else {
@@ -335,9 +334,13 @@ const updateParams = res => {
             console.log(`${type}: ${json.error ? json.error.message || json.error.type || json.detail : 'OK'}`);
         })(flag.type))));
 /***************************** */
-        console.log(`[35mRestricted![0m\nindex: [36m${currentIndex}[0m`);
-        Config.CookieArray?.length > 0 && CookieChanger.emit('ChangeCookie');
-        return;
+        if (Config.CookieArray?.length > 0) {
+            console.log(`[35mRestricted![0m`);
+            Config.Cookiecounter < 0 && console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m`);
+            console.log(`index: [36m${currentIndex}[0m`);
+            CookieChanger.emit('ChangeCookie');
+            return;
+        }
     }
     if (Config.CookieArray.length > 0) {
         let changer = false;
@@ -351,7 +354,7 @@ const updateParams = res => {
         if (accountinfo.includes('\\"completed_verification_at\\":null')) {
             Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
             (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-            currentIndex = (currentIndex - 1) % Config.CookieArray.length;
+            currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
             console.log(`[31mUnverified![0m`);
             changer = true;
         }
@@ -362,10 +365,6 @@ const updateParams = res => {
         }
         if (Config.Cookiecounter < 0) {
             console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
-            if (percentage >= 100) {
-                console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
-                return process.exit();
-            }
             changer = true;
         }
         if (changer) {
@@ -539,7 +538,7 @@ const updateParams = res => {
                             if (res.status === 403 && Config.CookieArray?.length > 0) {
                                 Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
                                 (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-                                currentIndex = (currentIndex - 1) % Config.CookieArray.length;
+                                currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
                                 CookieChanger.emit('ChangeCookie');
                             }
 /**************************** */
@@ -742,7 +741,7 @@ const updateParams = res => {
                     if (clewdStream.readonly) {
                         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
                         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-                        currentIndex = (currentIndex - 1) % Config.CookieArray.length;
+                        currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
                     }
                     changeflag += 1;
                     if (Config.CookieArray?.length > 0 && (clewdStream.cookiechange || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
