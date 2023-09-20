@@ -124,7 +124,7 @@ const simpletokenizer = (str) => {
 
     //消除空XML tags或多余的\n
     content = content.replace(/(\n)<\/hidden>\n+?<hidden>\n/g, '');
-    content = content.replace(/\n<(example|hidden)>\n+?<\/\1>/g, '');
+    content = content.replace(/\n<(card|example|hidden)>\n+?<\/\1>/g, '');
     content = content.replace(/(?<=\n<(card|hidden|example)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
@@ -246,7 +246,7 @@ const updateParams = res => {
     if (Config.CookieArray?.length > 0) {
         Config.Cookie = Config.CookieArray[currentIndex];
         currentIndex = (currentIndex + 1) % Config.CookieArray.length;
-        Config.Cookiecounter < 0 && (changetime += 1);
+        changetime += 1;
     }
 /***************************** */
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
@@ -266,7 +266,7 @@ const updateParams = res => {
     if (accRes.statusText === 'Forbidden' && Config.CookieArray.length > 0) {
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-        currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
+        currentIndex = (currentIndex - 1) % Config.CookieArray.length;
         console.log(`[31mExpired![0m`);
         CookieChanger.emit('ChangeCookie');
         return;
@@ -287,12 +287,20 @@ const updateParams = res => {
         capabilities: accInfo.capabilities
     });
     uuidOrg = accInfo?.uuid;
-/************************* */ 
+/************************* */
+    let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100
     if (uuidOrgArray.includes(uuidOrg)) {
         console.log(`[35mOverlap![0m`);
+        if (Config.Cookiecounter < 0) {
+            console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
+            if (percentage >= 100) {
+                console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
+                return process.exit();
+            }
+        }
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-        currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
+        currentIndex = (currentIndex - 1) % Config.CookieArray.length;
         CookieChanger.emit('ChangeCookie');
         return;
     } else {
@@ -343,7 +351,7 @@ const updateParams = res => {
         if (accountinfo.includes('\\"completed_verification_at\\":null')) {
             Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
             (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-            currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
+            currentIndex = (currentIndex - 1) % Config.CookieArray.length;
             console.log(`[31mUnverified![0m`);
             changer = true;
         }
@@ -353,11 +361,10 @@ const updateParams = res => {
             changer = true;
         }
         if (Config.Cookiecounter < 0) {
-            let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100;
             console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
-            if (percentage == 100) {
+            if (percentage >= 100) {
                 console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
-                process.exit();
+                return process.exit();
             }
             changer = true;
         }
@@ -532,7 +539,7 @@ const updateParams = res => {
                             if (res.status === 403 && Config.CookieArray?.length > 0) {
                                 Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
                                 (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-                                currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
+                                currentIndex = (currentIndex - 1) % Config.CookieArray.length;
                                 CookieChanger.emit('ChangeCookie');
                             }
 /**************************** */
@@ -735,7 +742,7 @@ const updateParams = res => {
                     if (clewdStream.readonly) {
                         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
                         (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
-                        currentIndex = currentIndex < 1 ? 0 : currentIndex - 1;
+                        currentIndex = (currentIndex - 1) % Config.CookieArray.length;
                     }
                     changeflag += 1;
                     if (Config.CookieArray?.length > 0 && (clewdStream.cookiechange || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
