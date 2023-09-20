@@ -57,7 +57,8 @@ const simpletokenizer = (str) => {
 }, AddxmlPlot = (content) => {
     // 检查内容中是否包含"<card>"
     if (!content.includes('<card>')) {
-        return content;
+        content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '$1');
+        return content.replace(/<customname>(.*?)<\/customname>/gm, '$1');
     }
 
     //role合并
@@ -70,8 +71,9 @@ const simpletokenizer = (str) => {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
         }
     }
-    content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '\n\n');
+    content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '$1');
     content = content.replace(/<\!-- Merge.*?Disable -->/gm, '');
+    content = content.replace(/<customname>(.*?)<\/customname>/gm, '$1');
 
     //格式顺序交换&越狱倒置
     content = content.replace(/<Prev(Assistant|Human)>.*?<\/Prev\1>/gs, function(match) {return match.replace(/\n\n(Assistant|Human):/g, '\n\ntemp$1:')});
@@ -118,8 +120,8 @@ const simpletokenizer = (str) => {
     let segcontentlastIndex = segcontentHuman.length - 1;
     if (segcontentlastIndex >= 2 && segcontentHuman[segcontentlastIndex].includes('<!-- Plain Prompt Enable -->') && !content.includes('\n\nPlainPrompt:')) {
         content = segcontentHuman.slice(0, segcontentlastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + segcontentHuman.slice(segcontentlastIndex).join('\n\nHuman:');
-        content = content.replace(/<\!-- Plain Prompt Enable -->/, '');
     }
+    content = content.replace(/<\!-- Plain Prompt Enable -->/, '');
     content = content.replace(/\n\nHuman:.*PlainPrompt:/, '\n\nPlainPrompt:');
 
     //消除空XML tags或多余的\n
@@ -561,7 +563,7 @@ const updateParams = res => {
                         mergedLogs.forEach(((message, idx) => {
                             const next = mergedLogs[idx + 1];
                             message.customname = (message => [ 'assistant', 'user' ].includes(message.role) && null != message.name && !(message.name in Replacements))(message);
-                            if (next) {
+                            if (next && !Config.Settings.xmlPlot) { //if (next) {
                                 if ('name' in message && 'name' in next) {
                                     if (message.name === next.name) {
                                         message.content += '\n\n' + next.content; //message.content += '\n' + next.content;
@@ -635,10 +637,17 @@ const updateParams = res => {
                                 return message.content;
                             }
                             let spacing = '';
-                            idx > 0 && (spacing = '\n\n'); //idx > 0 && (spacing = systemMessages.includes(message) ? '\n' : '\n\n');
-                            //const prefix = message.customname ? message.name + ': ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
-                            const prefix = message.customname ? message.role + ': <customname>' + message.name + '</customname>: ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
-                            return `${spacing}${message.strip ? '' : prefix}${'system' === message.role ? message.content : message.content.trim()}`;
+/****************************************************************/
+                            if (Config.Settings.xmlPlot) {
+                                idx > 0 && (spacing = '\n\n');
+                                const prefix = message.customname ? message.role + ': <customname>' + message.name + '</customname>: ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : 'xmlPlot: ' + Replacements[message.role];
+                                return `${spacing}${prefix}${message.content}`;
+                            } else {
+/****************************************************************/
+                                idx > 0 && (spacing = systemMessages.includes(message) ? '\n' : '\n\n');
+                                const prefix = message.customname ? message.name + ': ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
+                                return `${spacing}${message.strip ? '' : prefix}${'system' === message.role ? message.content : message.content.trim()}`;
+                            } //
                         }));
                         return {
                             prompt: genericFixes(prompt.join('')).trim(),
@@ -649,7 +658,6 @@ const updateParams = res => {
                     'R' !== type || prompt || (prompt = '...regen...');
 /****************************************************************/
                     Config.Settings.xmlPlot && (prompt = AddxmlPlot(prompt));
-                    prompt = prompt.replace(/<customname>(.*?)<\/customname>/gm, '$1');
                     Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?|[Ss]ystem)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padJson(prompt));
 /****************************************************************/
