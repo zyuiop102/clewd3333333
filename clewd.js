@@ -104,10 +104,12 @@ const simpletokenizer = (str) => {
     // 在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>"
     const exampleNote = content.match(/(?<=<example-note>).*(?=<\/example-note>)/) || '';
     const cardtag = content.match(/(?=\n\n<\/card>)/) || '</card>';
+    const exampletag = content.match(/(?=\n\n<\/example>)/) || '</example>';
     content = content.replace(/<example-note>.*<\/example-note>/, '');
     const firstChatStart = content.indexOf('\n\n[Start a new');
     const lastChatStart = content.lastIndexOf('\n\n[Start a new');
-    firstChatStart != -1 && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + '\n\n</example>' + content.slice(lastChatStart));
+    (firstChatStart != -1 && firstChatStart === lastChatStart) && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
+    firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}` + content.slice(lastChatStart));
     
     // 之后的第一个"Assistant: "之前插入"\n\n<plot>"
     const lastChatIndex = content.lastIndexOf('\n\n[Start a new');
@@ -127,7 +129,7 @@ const simpletokenizer = (str) => {
 
     //消除空XML tags或多余的\n
     content = content.replace(/(\n)<\/hidden>\n+?<hidden>\n/g, '');
-    content = content.replace(/\n<(card|example|hidden)>\n+?<\/\1>/g, '');
+    content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden)>\n+?<\/\1>/g, '');
     content = content.replace(/(?<=\n<(card|hidden|example)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
