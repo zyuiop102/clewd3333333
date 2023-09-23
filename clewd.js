@@ -4,7 +4,7 @@
 */
 'use strict';
 
-const {createServer: Server, IncomingMessage, ServerResponse} = require('node:http'), {createHash: Hash, randomUUID, randomInt, randomBytes} = require('node:crypto'), {TransformStream, ReadableStream} = require('node:stream/web'), {Readable, Writable} = require('node:stream'), {Blob} = require('node:buffer'), {existsSync: exists, writeFileSync: write, createWriteStream} = require('node:fs'), {join: joinP} = require('node:path'), {ClewdSuperfetch: Superfetch, SuperfetchAvailable} = require('./lib/clewd-superfetch'), {AI, fileName, genericFixes, bytesToSize, setTitle, checkResErr, Replacements, Main, fetch429} = require('./lib/clewd-utils'), ClewdStream = require('./lib/clewd-stream');
+const {createServer: Server, IncomingMessage, ServerResponse} = require('node:http'), {createHash: Hash, randomUUID, randomInt, randomBytes} = require('node:crypto'), {TransformStream, ReadableStream} = require('node:stream/web'), {Readable, Writable} = require('node:stream'), {Blob} = require('node:buffer'), {existsSync: exists, writeFileSync: write, createWriteStream} = require('node:fs'), {join: joinP} = require('node:path'), {ClewdSuperfetch: Superfetch, SuperfetchAvailable} = require('./lib/clewd-superfetch'), {AI, fileName, genericFixes, bytesToSize, setTitle, checkResErr, Replacements, Main} = require('./lib/clewd-utils'), ClewdStream = require('./lib/clewd-stream');
 
 /******************************************************* */
 let currentIndex = 0, Firstlogin = true, changeflag = 0, changetime = 0, totaltime = 0, uuidOrgArray = [];
@@ -14,7 +14,7 @@ require('events').EventEmitter.defaultMaxListeners = 0;
 
 CookieChanger.on('ChangeCookie', () => {
     Proxy && Proxy.close();
-    console.log(`\nChanging Cookie...\n`);
+    console.log(`Changing Cookie...\n`);
     Proxy.listen(Config.Port, Config.Ip, onListen);
     Proxy.on('error', (err => {
         console.error('Proxy error\n%o', err);
@@ -62,6 +62,9 @@ const simpletokenizer = (str) => {
         return content.replace(/<customname>(.*?)<\/customname>/gm, '$1');
     }
 
+    //群组
+    content = content.replace(/<customname>(.*?)<\/customname>/gm, '$1');
+
     //role合并
     if (!content.includes('<\!-- Merge Disable -->')) {
         if (!content.includes('<\!-- Merge Human Disable -->')) {
@@ -75,7 +78,6 @@ const simpletokenizer = (str) => {
     }
     content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '$1');
     content = content.replace(/<\!-- Merge.*?Disable -->/gm, '');
-    content = content.replace(/<customname>(.*?)<\/customname>/gm, '$1');
 
     //格式顺序交换&越狱倒置
     content = content.replace(/<Prev(Assistant|Human)>.*?<\/Prev\1>/gs, function(match) {return match.replace(/\n\n(Assistant|Human):/g, '\n\ntemp$1:')});
@@ -278,7 +280,7 @@ const updateParams = res => {
         !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
         currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
         console.log(`[31mExpired![0m`);
-        Config.Cookiecounter < 0 && console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
+        Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
         CookieChanger.emit('ChangeCookie');
         return;
     }
@@ -293,16 +295,16 @@ const updateParams = res => {
     }
     setTitle('ok');
     updateParams(accRes);
-    console.log('Logged in %o', {
+    console.log(Config.CookieArray?.length > 0 ? `(index: [36m${currentIndex || Config.CookieArray.length}[0m) Logged in %o` : 'Logged in %o', { //console.log('Logged in %o', {
         name: accInfo.name?.split('@')?.[0],
-        capabilities: accInfo.capabilities
+        capabilities: accInfo.capabilities,
     });
     uuidOrg = accInfo?.uuid;
 /************************* */
     if (uuidOrgArray.includes(uuidOrg)) {
         console.log(`[31mOverlap![0m`);
         currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
-        Config.Cookiecounter < 0 && console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
+        Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
         !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
         CookieChanger.emit('ChangeCookie');
@@ -341,21 +343,21 @@ const updateParams = res => {
 /***************************** */
         if (Config.CookieArray?.length > 0) {
             console.log(`[35mRestricted![0m`);
-            Config.Cookiecounter < 0 && console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m`);
-            console.log(`index: [36m${currentIndex}[0m`);
+            Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
             CookieChanger.emit('ChangeCookie');
             return;
         }
     }
     if (Config.CookieArray.length > 0) {
         let changer = false;
-        const res = await fetch(`${Config.rProxy}`, {
+        const allres = await fetch(`${Config.rProxy}`, {
             headers: {
                 ...AI.hdr(),
                 Cookie: getCookies()
             },
             method: 'GET'
-        }), accountinfo = await res.text();
+        }), accountinfo = await allres.text();
+        updateParams(allres);
         if (accountinfo.includes('\\"completed_verification_at\\":null')) {
             Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
             !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
@@ -363,16 +365,23 @@ const updateParams = res => {
             console.log(`[31mUnverified![0m`);
             changer = true;
         }
+        if (accountinfo.includes('\\"gate\":\\"segment:abuse\\",\\"gateValue\\":\\"true\\",')) {
+            Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
+            !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
+            currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
+            console.log(`[31mBanned![0m`);
+            changer = true;
+        }
         if (/\\"messageLimit\\":{\\"type\\":\\"(approaching_limit\\",\\"remaining\\":0|exceeded_limit)\\",/.test(accountinfo)) {
             console.log(`[35mExceeded limit![0m`);
-            Config.Cookiecounter >= 0 && console.log(`index: [36m${currentIndex}[0m`);
             changer = true;
         }
         if (Config.Cookiecounter < 0) {
-            console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
+            console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m`);
             changer = true;
         }
         if (changer) {
+            console.log('');
             CookieChanger.emit('ChangeCookie');
             return;
         }
@@ -414,11 +423,8 @@ const updateParams = res => {
 
       case '/v1/chat/completions':
         ((req, res) => {
-/******************************** */
-            let superfetch429 = false;
-/******************************** */
             setTitle('recv...');
-            let fetchAPI;
+            let fetchAPI, changer; //let fetchAPI;
             const abortControl = new AbortController, {signal} = abortControl;
             res.socket.on('close', (async () => {
                 abortControl.signal.aborted || abortControl.abort();
@@ -539,14 +545,6 @@ const updateParams = res => {
                                 })
                             });
                             updateParams(res);
-/**************************** */
-                            if (res.status === 403 && Config.CookieArray?.length > 0) {
-                                Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-                                !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
-                                currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
-                                CookieChanger.emit('ChangeCookie');
-                            }
-/**************************** */
                             await checkResErr(res);
                             return res;
                         })(signal);
@@ -746,18 +744,13 @@ const updateParams = res => {
                     clewdStream.censored && console.warn('[33mlikely your account is hard-censored[0m');
                     prevImpersonated = clewdStream.impersonated;
                     setTitle('ok ' + bytesToSize(clewdStream.size));
-                    console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
-/******************************** */
-                    200 !== fetchAPI.status && console.log(`index: [36m${currentIndex}[0m\n`);
-                    if (clewdStream.readonly) {
-                        Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-                        !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
-                        currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
-                    }
+                    //console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
+/******************************** */                    
+                    429 == fetchAPI.status ? console.log(`[35mExceeded limit![0m\n`) : console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
                     changeflag += 1;
-                    if (Config.CookieArray?.length > 0 && (clewdStream.cookiechange || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
+                    if (Config.CookieArray?.length > 0 && (429 == fetchAPI.status || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
                         changeflag = 0;
-                        superfetch429 = true;
+                        changer = true;
                     }
 /******************************** */
                     clewdStream.empty();
@@ -768,7 +761,7 @@ const updateParams = res => {
                     } catch (err) {}
                 }
 /******************************** */
-                (fetch429 || superfetch429) && CookieChanger.emit('ChangeCookie');
+                changer && CookieChanger.emit('ChangeCookie');
 /******************************** */
             }));
         })(req, res);
