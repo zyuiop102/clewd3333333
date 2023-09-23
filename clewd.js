@@ -371,8 +371,9 @@ const updateParams = res => {
             }
         }
         Exceededlimit && console.log(`[35mExceeded limit![0m`);
-        Config.Cookiecounter < 0 ? console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`) : console.log('');
+        Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
         if (Unverified || Banned || Exceededlimit || Config.Cookiecounter < 0) {
+            console.log('');
             CookieChanger.emit('ChangeCookie');
             return;
         }
