@@ -10,6 +10,7 @@ const {createServer: Server, IncomingMessage, ServerResponse} = require('node:ht
 let currentIndex = 0, Firstlogin = true, changeflag = 0, changetime = 0, totaltime = 0, uuidOrgArray = [];
 
 const events = require('events'), CookieChanger = new events.EventEmitter();
+require('events').EventEmitter.defaultMaxListeners = 0;
 
 CookieChanger.on('ChangeCookie', () => {
     Proxy && Proxy.close();
@@ -108,7 +109,7 @@ const simpletokenizer = (str) => {
     content = content.replace(/<example-note>.*<\/example-note>/, '');
     const firstChatStart = content.indexOf('\n\n[Start a new');
     const lastChatStart = content.lastIndexOf('\n\n[Start a new');
-    (firstChatStart != -1 && firstChatStart === lastChatStart) && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
+    firstChatStart != -1 && firstChatStart === lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
     firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}` + content.slice(lastChatStart));
     
     // 之后的第一个"Assistant: "之前插入"\n\n<plot>"
@@ -133,9 +134,8 @@ const simpletokenizer = (str) => {
     content = content.replace(/(?<=\n<(card|hidden|example)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
-    content = content.trim();
 
-    return content;
+    return content.trim();
 };
 /******************************************************* */
 
@@ -152,7 +152,7 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
     CookieArray: [],
     Cookiecounter: 0,
     CookieIndex: 0,
-    Ip: process.env.PORT ? '0.0.0.0' : '127.0.0.1',
+    Ip: (process.env.Cookie || process.env.CookieArray) ? '0.0.0.0' : '127.0.0.1',
     Port: process.env.PORT || 8444,
     localtunnel: false,
     BufferSize: 1,
@@ -275,7 +275,7 @@ const updateParams = res => {
 /**************************** */
     if (accRes.statusText === 'Forbidden' && Config.CookieArray?.length > 0) {
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-        (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
+        !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
         currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
         console.log(`[31mExpired![0m`);
         Config.Cookiecounter < 0 && console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
@@ -300,11 +300,11 @@ const updateParams = res => {
     uuidOrg = accInfo?.uuid;
 /************************* */
     if (uuidOrgArray.includes(uuidOrg)) {
-        console.log(`[35mOverlap![0m`);
+        console.log(`[31mOverlap![0m`);
         currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
         Config.Cookiecounter < 0 && console.log(`progress: [32m${percentage.toFixed(2)}%[0m\nlength: [33m${Config.CookieArray.length}[0m\nindex: [36m${currentIndex || Config.CookieArray.length}[0m`);
         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-        (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
+        !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
         CookieChanger.emit('ChangeCookie');
         return;
     } else {
@@ -319,7 +319,7 @@ const updateParams = res => {
                 remaining_days: days
             };
         }));
-        console.warn('[31mYour account has warnings[0m %o', formattedFlags);
+        console.warn('[35mYour account has warnings[0m %o', formattedFlags); //console.warn('[31mYour account has warnings[0m %o', formattedFlags);
         await Promise.all(accInfo.active_flags.map((flag => (async type => {
             if (!Config.Settings.ClearFlags) {
                 return;
@@ -358,7 +358,7 @@ const updateParams = res => {
         }), accountinfo = await res.text();
         if (accountinfo.includes('\\"completed_verification_at\\":null')) {
             Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-            (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
+            !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
             currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
             console.log(`[31mUnverified![0m`);
             changer = true;
@@ -542,7 +542,7 @@ const updateParams = res => {
 /**************************** */
                             if (res.status === 403 && Config.CookieArray?.length > 0) {
                                 Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-                                (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
+                                !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
                                 currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
                                 CookieChanger.emit('ChangeCookie');
                             }
@@ -751,7 +751,7 @@ const updateParams = res => {
                     200 !== fetchAPI.status && console.log(`index: [36m${currentIndex}[0m\n`);
                     if (clewdStream.readonly) {
                         Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-                        (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
+                        !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
                         currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
                     }
                     changeflag += 1;
@@ -855,7 +855,7 @@ const updateParams = res => {
         }
     }
     Config.CookieArray = uniqueArr;
-    (!process.env.Cookie && !process.env.CookieArray) && writeSettings(Config);
+    !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
     currentIndex = Config.CookieIndex > 0 ? Config.CookieIndex - 1 : Config.Cookiecounter >= 0 ? Math.floor(Math.random()*Config.CookieArray.length) : 0;
 /***************************** */
     Proxy.listen(Config.Port, Config.Ip, onListen);
