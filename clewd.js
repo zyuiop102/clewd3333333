@@ -349,7 +349,6 @@ const updateParams = res => {
         }
     }
     if (Config.CookieArray.length > 0) {
-        let changer = false;
         const allres = await fetch(`${Config.rProxy}`, {
             headers: {
                 ...AI.hdr(),
@@ -358,30 +357,22 @@ const updateParams = res => {
             method: 'GET'
         }), accountinfo = await allres.text();
         updateParams(allres);
-        if (accountinfo.includes('\\"completed_verification_at\\":null')) {
+        const Unverified = accountinfo.includes('\\"completed_verification_at\\":null');
+        const Banned = accountinfo.includes('\\"gate\":\\"segment:abuse\\",\\"gateValue\\":\\"true\\",');
+        const Exceededlimit = /\\"messageLimit\\":{\\"type\\":\\"(approaching_limit\\",\\"remaining\\":0|exceeded_limit)\\",/.test(accountinfo);
+        if (Unverified || Banned) {
             Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
             !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
             currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
-            console.log(`[31mUnverified![0m`);
-            changer = true;
+            if (Unverified) {
+                console.log(`[31mUnverified![0m`);
+            } else {
+                console.log(`[31mBanned![0m`);
+            }
         }
-        if (accountinfo.includes('\\"gate\":\\"segment:abuse\\",\\"gateValue\\":\\"true\\",')) {
-            Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-            !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
-            currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
-            console.log(`[31mBanned![0m`);
-            changer = true;
-        }
-        if (/\\"messageLimit\\":{\\"type\\":\\"(approaching_limit\\",\\"remaining\\":0|exceeded_limit)\\",/.test(accountinfo)) {
-            console.log(`[35mExceeded limit![0m`);
-            changer = true;
-        }
-        if (Config.Cookiecounter < 0) {
-            console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m`);
-            changer = true;
-        }
-        if (changer) {
-            console.log('');
+        Exceededlimit && console.log(`[35mExceeded limit![0m`);
+        Config.Cookiecounter < 0 ? console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`) : console.log('');
+        if (Unverified || Banned || Exceededlimit || Config.Cookiecounter < 0) {
             CookieChanger.emit('ChangeCookie');
             return;
         }
