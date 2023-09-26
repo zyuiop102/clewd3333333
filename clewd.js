@@ -7,7 +7,7 @@
 const {createServer: Server, IncomingMessage, ServerResponse} = require('node:http'), {createHash: Hash, randomUUID, randomInt, randomBytes} = require('node:crypto'), {TransformStream, ReadableStream} = require('node:stream/web'), {Readable, Writable} = require('node:stream'), {Blob} = require('node:buffer'), {existsSync: exists, writeFileSync: write, createWriteStream} = require('node:fs'), {join: joinP} = require('node:path'), {ClewdSuperfetch: Superfetch, SuperfetchAvailable} = require('./lib/clewd-superfetch'), {AI, fileName, genericFixes, bytesToSize, setTitle, checkResErr, Replacements, Main} = require('./lib/clewd-utils'), ClewdStream = require('./lib/clewd-stream');
 
 /******************************************************* */
-let currentIndex = 0, Firstlogin = true, changeflag = 0, changetime = 0, totaltime = 0, uuidOrgArray = [];
+let currentIndex, Firstlogin = true, changeflag = 0, changetime = 0, totaltime, uuidOrgArray = [];
 
 const events = require('events'), CookieChanger = new events.EventEmitter();
 require('events').EventEmitter.defaultMaxListeners = 0;
@@ -21,10 +21,10 @@ CookieChanger.on('ChangeCookie', () => {
     }));
 });
 
-const simpletokenizer = (str) => {
+const simpletokenizer = (prompt) => {
     let byteLength = 0;
-    for (let i = 0; i < str.length; i++) {
-        let code = str.charCodeAt(i);
+    for (let i = 0; i < prompt.length; i++) {
+        let code = prompt.charCodeAt(i);
         if (code <= 0xFF) {
             byteLength += 0.6;
         } else if (code <= 0xFFFF) {
@@ -34,28 +34,26 @@ const simpletokenizer = (str) => {
         }
     }
     return byteLength;
-}, padJson = (json) => {
+}, padtxt = (content) => {
     if (Config.padtxt_placeholder.length > 0) {
         var placeholder = Config.padtxt_placeholder;
     } else {
         const bytes = randomInt(5, 15);
         var placeholder = randomBytes(bytes).toString('hex');
     }
-    var count = Math.floor((Config.Settings.padtxt - simpletokenizer(json)) / simpletokenizer(placeholder)); 
+    let count = Math.floor((Config.Settings.padtxt - simpletokenizer(content)) / simpletokenizer(placeholder)); 
 
     // 生成占位符字符串
-    var padding = '';
-    for (var i = 0; i < count; i++) {
+    let padding = '';
+    for (let i = 0; i < count; i++) {
         padding += placeholder;
     }
 
-    // 在json前面添加占位符, 在末尾增加空行然后添加json
-    var result = padding + '\n\n\n' + json;
+    // 在prompt前面添加占位符, 在末尾增加空行然后添加prompt
+    content = padding + '\n\n\n' + content;
 
-    result = result.replace(/^\s*/, '');
-
-    return result;
-}, AddxmlPlot = (content) => {
+    return content.trim();
+}, xmlPlot = (content) => {
     // 检查内容中是否包含"<card>"
     if (!content.includes('<card>')) {
         content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '$1');
@@ -104,22 +102,16 @@ const simpletokenizer = (str) => {
     //给开头加上</file-attachment-contents>用于截断附加文件标识
     content.includes('<file-attachment-contents>') && (content = '</file-attachment-contents>\n\n' + content);
 
-    // 在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>"
+    // 在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>\n\n<plot>\n\n"
     const exampleNote = content.match(/(?<=<example-note>).*(?=<\/example-note>)/) || '';
     const cardtag = content.match(/(?=\n\n<\/card>)/) || '</card>';
     const exampletag = content.match(/(?=\n\n<\/example>)/) || '</example>';
+    const plot = content.includes('</plot>') ? '<plot>' : '';
     content = content.replace(/<example-note>.*<\/example-note>/, '');
     const firstChatStart = content.indexOf('\n\n[Start a new');
     const lastChatStart = content.lastIndexOf('\n\n[Start a new');
     firstChatStart != -1 && firstChatStart === lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
-    firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}` + content.slice(lastChatStart));
-    
-    // 之后的第一个"Assistant: "之前插入"\n\n<plot>"
-    const lastChatIndex = content.lastIndexOf('\n\n[Start a new');
-    if (lastChatIndex != -1 && content.includes('</plot>')) { 
-        const assistantIndex = content.indexOf('\n\nAssistant:', lastChatIndex);
-        assistantIndex != -1 && (content = content.slice(0, assistantIndex) + '\n\n<plot>' + content.slice(assistantIndex));
-    }
+    firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}\n\n${plot}` + content.slice(lastChatStart));
 
     //Plain Prompt
     segcontentHuman = content.split('\n\nHuman:');
@@ -131,10 +123,11 @@ const simpletokenizer = (str) => {
     content = content.replace(/\n\nHuman:.*PlainPrompt:/, '\n\nPlainPrompt:');
 
     //消除空XML tags或多余的\n
-    content = content.replace(/(\n)<\/hidden>\n+?<hidden>\n/g, '');
-    content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden)>\n+?<\/\1>/g, '');
-    content = content.replace(/(?<=\n<(card|hidden|example)>\n)\s*/g, '');
-    content = content.replace(/\s*(?=\n<\/(card|hidden|example)>(\n|$))/g, '');
+    content = content.replace(/\n<\/hidden>\s+?<hidden>\n/g, '');
+    content = content.replace(/\n<(card|example|hidden|plot)>\s+?<\1>/g, '\n<$1>');
+    content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot)>\s+?<\/\1>/g, '');
+    content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot)>\n)\s*/g, '');
+    content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
 
     return content.trim();
@@ -360,18 +353,17 @@ const updateParams = res => {
         const Unverified = accountinfo.includes('\\"completed_verification_at\\":null');
         const Banned = accountinfo.includes('\\"gate\":\\"segment:abuse\\",\\"gateValue\\":\\"true\\",');
         const Exceededlimit = /\\"messageLimit\\":{\\"type\\":\\"(approaching_limit\\",\\"remaining\\":0|exceeded_limit)\\",/.test(accountinfo);
+        const Remain = /\\"messageLimit\\":{\\"type\\":\\"approaching_limit\\",\\"remaining\\":\d+\\",/.exec(accountinfo);
+        Remain && (changeflag = Math.max(Config.Cookiecounter - Remain[0], changeflag));
         if (Unverified || Banned) {
             Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
             !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
             currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
-            if (Unverified) {
-                console.log(`[31mUnverified![0m`);
-            } else {
-                console.log(`[31mBanned![0m`);
-            }
         }
+        Unverified && console.log(`[31mUnverified![0m`);
+        Banned && console.log(`[31mBanned![0m`);
         Exceededlimit && console.log(`[35mExceeded limit![0m`);
-        Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
+        Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m`);
         if (Unverified || Banned || Exceededlimit || Config.Cookiecounter < 0) {
             console.log('');
             CookieChanger.emit('ChangeCookie');
@@ -650,17 +642,17 @@ const updateParams = res => {
                     console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
 /****************************************************************/
-                    Config.Settings.xmlPlot && (prompt = AddxmlPlot(prompt));
-                    Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?|[Ss]ystem)):[ ]?/g, '： '));
-                    Config.Settings.padtxt && (prompt = padJson(prompt));
+                    Config.Settings.xmlPlot && (prompt = xmlPlot(prompt));
+                    Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
+                    Config.Settings.padtxt && (prompt = padtxt(prompt));
 /****************************************************************/
                     Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
                         const attachments = [];
                         if (Config.Settings.PromptExperiments) {
 /****************************************************************/
-                            let splitprompt = prompt.split('\n\nPlainPrompt:');
-                            prompt = splitprompt[0];
+                            let splitedprompt = prompt.split('\n\nPlainPrompt:');
+                            prompt = splitedprompt[0];
 /****************************************************************/
                             attachments.push({
                                 extracted_content: (prompt),
@@ -670,7 +662,7 @@ const updateParams = res => {
                             });
                             prompt = 'r' === type ? Config.PromptExperimentFirst : Config.PromptExperimentNext;
 /****************************************************************/                            
-                            splitprompt.length > 1 && (prompt = prompt + splitprompt[1]);
+                            splitedprompt.length > 1 && (prompt = prompt + splitedprompt[1]);
 /****************************************************************/                            
                         }
                         let res;
