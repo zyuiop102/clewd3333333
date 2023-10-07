@@ -251,7 +251,7 @@ const updateParams = res => {
         changetime += 1;
     }
     let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100
-    if (percentage > 100) {
+    if (Config.Cookiecounter < 0 && percentage > 100) {
         console.log(`\n※※※Cookie cleanup completed※※※\n\n`);
         return process.exit();
     }
