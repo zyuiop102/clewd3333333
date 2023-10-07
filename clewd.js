@@ -57,11 +57,13 @@ const simpletokenizer = (prompt) => {
     // 检查内容中是否包含"<card>"
     if (!content.includes('<card>')) {
         content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '$1');
+        content = content.replace(/(<reply>\n|\n<\/reply>)/g, '');
         return content.replace(/<customname>(.*?)<\/customname>/gm, '$1');
     }
 
     //群组
-    content = content.replace(/<customname>(.*?)<\/customname>/gm, '$1');
+    content = content.replace(/(<reply>\n|\n<\/reply>)\1*/g, '$1');
+    content = content.replace(/<customname>(.*?)<\/customname>:/gm, '$1:\n');
 
     //role合并
     if (!content.includes('<\!-- Merge Disable -->')) {
@@ -123,11 +125,11 @@ const simpletokenizer = (prompt) => {
     content = content.replace(/\n\nHuman:.*PlainPrompt:/, '\n\nPlainPrompt:');
 
     //消除空XML tags或多余的\n
-    content = content.replace(/\n<\/hidden>\s+?<hidden>\n/g, '');
-    content = content.replace(/\n<(card|example|hidden|plot)>\s+?<\1>/g, '\n<$1>');
-    content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot)>\s+?<\/\1>/g, '');
-    content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot)>\n)\s*/g, '');
-    content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot)>(\n|$))/g, '');
+    content = content.replace(/\n<\/(hidden|META)>\s+?<\1>\n/g, '');
+    content = content.replace(/\n<(card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>');
+    content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '');
+    content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META)>\n)\s*/g, '');
+    content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot|META)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
 
     return content.trim();
@@ -250,7 +252,7 @@ const updateParams = res => {
     }
     let percentage = ((changetime + Config.CookieIndex) / totaltime) * 100
     if (percentage > 100) {
-        console.log(`\n\n※※※Cookie cleanup completed※※※\n\n`);
+        console.log(`\n※※※Cookie cleanup completed※※※\n\n`);
         return process.exit();
     }
 /***************************** */
@@ -305,7 +307,7 @@ const updateParams = res => {
     } else {
         uuidOrgArray.push(uuidOrg);
     }
-/************************* */    
+/************************* */
     if (accInfo?.active_flags.length > 0) {
         const now = new Date, formattedFlags = accInfo.active_flags.map((flag => {
             const days = ((new Date(flag.expires_at).getTime() - now.getTime()) / 864e5).toFixed(2);
@@ -626,7 +628,7 @@ const updateParams = res => {
                             if (Config.Settings.xmlPlot) {
                                 idx > 0 && (spacing = '\n\n');
                                 const prefix = message.customname ? message.role + ': <customname>' + message.name + '</customname>: ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : 'xmlPlot: ' + Replacements[message.role];
-                                return `${spacing}${prefix}${message.content}`;
+                                return `${spacing}${prefix}${message.customname ? '<reply>\n' + message.content.trim() + '\n</reply>' : message.content}`;
                             } else {
 /****************************************************************/
                                 idx > 0 && (spacing = systemMessages.includes(message) ? '\n' : '\n\n');
