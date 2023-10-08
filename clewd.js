@@ -296,7 +296,7 @@ const updateParams = res => {
     });
     uuidOrg = accInfo?.uuid;
 /************************* */
-    if (uuidOrgArray.includes(uuidOrg)) {
+    if (uuidOrgArray.includes(uuidOrg) && percentage <= 100) {
         console.log(`[31mOverlap![0m`);
         currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
         Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
