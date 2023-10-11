@@ -79,27 +79,28 @@ const simpletokenizer = (prompt) => {
     content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '$1');
     content = content.replace(/<\!-- Merge.*?Disable -->/gm, '');
 
-    //格式顺序交换&越狱倒置
-    content = content.replace(/<Prev(Assistant|Human)>.*?<\/Prev\1>/gs, function(match) {return match.replace(/\n\n(Assistant|Human):/g, '\n\ntemp$1:')});
-    let segcontentAssistant = content.split('\n\nAssistant:');
-    let processedsegAssistant = segcontentAssistant.map(seg => {
-        return seg.replace(/(\n\nHuman:.*?)<PrevAssistant>(.*?)<\/PrevAssistant>/gs, '\n\n$2$1');
-    });
-    content = processedsegAssistant.join('\n\nAssistant:');
+    //自定义插入
+    content = content.replace(/(<\/?)PrevAssistant>/gm, '$1@1>');
+    content = content.replace(/(<\/?)PrevHuman>/gm, '$1@2>');
+    let splitContent = content.split(/\n\n(?=Assistant:|Human:)/g);
+    let match;
+    while ((match = /<@(\d+)>(.*?)<\/@\1>/gs.exec(content)) !== null) {
+        let index = splitContent.length - parseInt(match[1]) - 1;
+        if (index >= 0) {
+            splitContent[index] += '\n\n' + match[2];
+        }
+        content = content.replace(match[0], '');
+    }
+    content = splitContent.join('\n\n');
+    content = content.replace(/<@(\d+)>.*?<\/@\1>/gs, '');
+
+    //越狱倒置
     let segcontentHuman = content.split('\n\nHuman:');
     const seglength = segcontentHuman.length;
-    for (let i = 1; i < seglength; i++) {
-        const match = segcontentHuman[i].match(/<PrevHuman>.*?<\/PrevHuman>/s);
-        if (match) {
-            segcontentHuman[i - 1] += match[0].replace(/<PrevHuman>(.*?)<\/PrevHuman>/s, '\n\n$1');
-            segcontentHuman[i] = segcontentHuman[i].replace(match[0], '');
-        }
-    }
     if (/Assistant: *.$/.test(content) && seglength > 1 && !segcontentHuman[seglength - 2].includes('\n\nAssistant:')) {
         segcontentHuman[seglength - 2] = segcontentHuman.splice(seglength - 1, 1, segcontentHuman[seglength - 2])[0];
     }
     content = segcontentHuman.join('\n\nHuman:');
-    content = content.replace(/\n\ntemp(Assistant|Human):/g, '\n\n$1:');
 
     //给开头加上</file-attachment-contents>用于截断附加文件标识
     content.includes('<file-attachment-contents>') && (content = '</file-attachment-contents>\n\n' + content);
@@ -125,11 +126,12 @@ const simpletokenizer = (prompt) => {
     content = content.replace(/\n\nHuman:.*PlainPrompt:/, '\n\nPlainPrompt:');
 
     //消除空XML tags或多余的\n
+    content = content.replace(/\s*<\|curtail\|>\s*/g, '\n');
     content = content.replace(/\n<\/(hidden|META)>\s+?<\1>\n/g, '');
     content = content.replace(/\n<(card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>');
     content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '');
-    content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META)>\n)\s*/g, '');
-    content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot|META)>(\n|$))/g, '');
+    content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '');
+    content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
 
     return content.trim();
