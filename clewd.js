@@ -128,7 +128,7 @@ const simpletokenizer = (prompt) => {
     //消除空XML tags或多余的\n
     content = content.replace(/\s*<\|curtail\|>\s*/g, '\n');
     content = content.replace(/\n<\/(hidden|META)>\s+?<\1>\n/g, '');
-    content = content.replace(/\n<(card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>');
+    content = content.replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>');
     content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '');
     content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '');
