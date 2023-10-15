@@ -311,19 +311,21 @@ const updateParams = res => {
     }
 /************************* */
     if (accInfo?.active_flags.length > 0) {
+        let flagtype; //
         const now = new Date, formattedFlags = accInfo.active_flags.map((flag => {
             const days = ((new Date(flag.expires_at).getTime() - now.getTime()) / 864e5).toFixed(2);
+            flagtype = flag.type; //
             return {
                 type: flag.type,
                 remaining_days: days
             };
         }));
-        console.warn('[35mYour account has warnings[0m %o', formattedFlags); //console.warn('[31mYour account has warnings[0m %o', formattedFlags);
+        console.warn(`${'consumer_banned' === flagtype ? '[33m' : '[35m'}Your account has warnings[0m %o`, formattedFlags); //console.warn('[31mYour account has warnings[0m %o', formattedFlags);
         await Promise.all(accInfo.active_flags.map((flag => (async type => {
             if (!Config.Settings.ClearFlags) {
                 return;
             }
-            if ('consumer_restricted_mode' === type) {
+            if ('consumer_restricted_mode' === type || 'consumer_banned' === flag.type) { //if ('consumer_restricted_mode' === type) {
                 return;
             }
             const req = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy}/api/organizations/${uuidOrg}/flags/${type}/dismiss`, {
@@ -338,7 +340,7 @@ const updateParams = res => {
             console.log(`${type}: ${json.error ? json.error.message || json.error.type || json.detail : 'OK'}`);
         })(flag.type))));
 /***************************** */
-        if (Config.CookieArray?.length > 0) {
+        if (Config.CookieArray?.length > 0 && 'consumer_banned' != flagtype) {
             console.log(`[35mRestricted![0m`);
             Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
             CookieChanger.emit('ChangeCookie');
