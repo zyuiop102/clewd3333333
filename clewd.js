@@ -177,7 +177,7 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
         PreserveChats: true,
         LogMessages: true,
         FullColon: true,
-        padtxt: 13500,
+        padtxt: 15000,
         xmlPlot: true,
         Superfetch: true
     }
@@ -320,7 +320,7 @@ const updateParams = res => {
                 remaining_days: days
             };
         }));
-        console.warn(`${'consumer_banned' === flagtype ? '[33m' : '[35m'}Your account has warnings[0m %o`, formattedFlags); //console.warn('[31mYour account has warnings[0m %o', formattedFlags);
+        console.warn(`${'consumer_banned' === flagtype ? '[31m' : '[35m'}Your account has warnings[0m %o`, formattedFlags); //console.warn('[31mYour account has warnings[0m %o', formattedFlags);
         await Promise.all(accInfo.active_flags.map((flag => (async type => {
             if (!Config.Settings.ClearFlags) {
                 return;
@@ -340,8 +340,13 @@ const updateParams = res => {
             console.log(`${type}: ${json.error ? json.error.message || json.error.type || json.detail : 'OK'}`);
         })(flag.type))));
 /***************************** */
-        if (Config.CookieArray?.length > 0 && 'consumer_banned' != flagtype) {
-            console.log(`[35mRestricted![0m`);
+        if (Config.CookieArray?.length > 0) {
+            console.log(`${'consumer_banned' === flagtype ? '[31mBanned' : '[35mRestricted'}![0m`); //console.log(`[35mRestricted![0m`);
+            if ('consumer_banned' === flagtype) {
+                Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
+                !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
+                currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
+            }
             Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
             CookieChanger.emit('ChangeCookie');
             return;
@@ -767,14 +772,16 @@ const updateParams = res => {
 
       default:
         req.url !== '/' && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
-        res.json({
+        res.json(
+            `${Main}完全开源、免费且禁止商用\n\n使用以上地址+'/v1'作为反代地址\n\nFAQ: https://rentry.org/teralomaniac_clewd`
+            /*{
             error: {
                 message: '404 Not Found',
                 type: 404,
                 param: null,
                 code: 404
             }
-        }, 200);
+        }*/, 200);
     }
 }));
 
