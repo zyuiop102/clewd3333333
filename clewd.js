@@ -750,11 +750,11 @@ const updateParams = res => {
 /******************************** */
                     clewdStream.empty();
                 }
-                if (prevImpersonated) {
+                //if (prevImpersonated) {
                     try {
                         await deleteChat(Conversation.uuid);
                     } catch (err) {}
-                }
+                //}
 /******************************** */
                 changer && CookieChanger.emit('ChangeCookie');
 /******************************** */
