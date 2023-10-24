@@ -335,12 +335,15 @@ const updateParams = res => {
     });
     uuidOrg = accInfo?.uuid;
 /************************* */
-    const Overlap = (uuidOrgArray.includes(uuidOrg) && percentage <= 100) && console.log(`[31mOverlap![0m`);
+    const Overlap = (uuidOrgArray.includes(uuidOrg) && percentage <= 100);
     !Overlap && uuidOrgArray.push(uuidOrg);
-    const Unverified = (!accountInfo.completed_verification_at) && console.log(`[31mUnverified![0m`);
+    const Unverified = (!accountInfo.completed_verification_at);
     const abuseTag = accountInfo.statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0];
-    const Banned = (abuseTag.gateValue === 'true' && abuseTag.gate === 'segment:abuse') && console.log(`[31mBanned![0m`);
+    const Banned = (abuseTag.gateValue === 'true' && abuseTag.gate === 'segment:abuse');
     if (Overlap || Unverified || Banned) {
+        Overlap && console.log(`[31mOverlap![0m`);
+        Unverified && console.log(`[31mUnverified![0m`);
+        Banned && console.log(`[31mBanned![0m`);
         CookieCleaner();
         Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
         return CookieChanger.emit('ChangeCookie');
@@ -397,12 +400,12 @@ const updateParams = res => {
         });
         await checkResErr(allRes);
         const allInfo = await allRes.text();
-        const Exceededlimit = /\\"messageLimit\\":{\\"type\\":\\"(approaching_limit\\",\\"remaining\\":0|exceeded_limit)\\",/.test(allInfo) && console.log(`[35mExceeded limit![0m`);
+        const Exceededlimit = /\\"messageLimit\\":{\\"type\\":\\"(approaching_limit\\",\\"remaining\\":0|exceeded_limit)\\",/.test(allInfo);
         const Remain = /\\"messageLimit\\":{\\"type\\":\\"approaching_limit\\",\\"remaining\\":\d+\\",/.exec(allInfo);
         Remain && (changeflag = Math.max(Config.Cookiecounter - Remain[0], changeflag));
         Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m`);
         if (Exceededlimit) {
-            console.log('');
+            console.log(`[35mExceeded limit![0m\n`);
             return CookieChanger.emit('ChangeCookie');
         }
 /***************************** */
