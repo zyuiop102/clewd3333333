@@ -21,8 +21,6 @@ CookieChanger.on('ChangeCookie', () => {
     }));
 });
 
-
-
 const CookieCleaner = () => {
     Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
     !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
@@ -125,7 +123,7 @@ const CookieCleaner = () => {
         content = segcontentHuman.slice(0, segcontentlastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + segcontentHuman.slice(segcontentlastIndex).join('\n\nHuman:');
     }
     content = content.replace(/<\!-- Plain Prompt Enable -->/, '');
-    content = content.replace(/\n\nHuman:.*PlainPrompt:/, '\n\nPlainPrompt:');
+    content = content.replace(/\n\nHuman: *PlainPrompt:/, '\n\nPlainPrompt:');
 
     //<card>群组
     if (!card) {
@@ -150,15 +148,24 @@ const CookieCleaner = () => {
     firstChatStart != -1 && firstChatStart === lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
     firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n\n${exampleNote}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}\n\n${plot}` + content.slice(lastChatStart));
 
-    //<card>消除空XML tags或多余的\n
+    //<card>消除空XML tags
     content = content.replace(/\s*<\|curtail\|>\s*/g, '\n');
     content = content.replace(/\n<\/(hidden|META)>\s+?<\1>\n/g, '');
     content = content.replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>');
     content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '');
     content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '');
-    content = content.replace(/(?<=\n)\n(?=\n)/g, '');
 
+    //<card>正则
+    while ((match = /<regex>"(\/?)(.*)\1(.*)" *: *"(.*?)"<\/regex>/gm.exec(content)) !== null) {
+        try {
+            content = content.replace(new RegExp(match[2], match[3]), match[4]);
+        } catch (error) {}
+        content = content.replace(match[0], '');
+    }
+
+    //<card>消除两端空白符和多余的\n
+    content = content.replace(/(?<=\n)\n(?=\n)/g, '');
     return content.trim();
 };
 /******************************************************* */
@@ -341,9 +348,7 @@ const updateParams = res => {
     const abuseTag = accountInfo.statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0];
     const Banned = (abuseTag.gateValue === 'true' && abuseTag.gate === 'segment:abuse');
     if (Overlap || Unverified || Banned) {
-        Overlap && console.log(`[31mOverlap![0m`);
-        Unverified && console.log(`[31mUnverified![0m`);
-        Banned && console.log(`[31mBanned![0m`);
+        Overlap ? console.log(`[31mOverlap![0m`) : Unverified ? console.log(`[31mUnverified![0m`) : Banned && console.log(`[31mBanned![0m`);
         CookieCleaner();
         Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
         return CookieChanger.emit('ChangeCookie');
@@ -762,13 +767,6 @@ const updateParams = res => {
                     }, Logger);
                     titleTimer = setInterval((() => setTitle('recv ' + bytesToSize(clewdStream.size))), 300);
                     Config.Settings.Superfetch ? await Readable.toWeb(fetchAPI.body).pipeThrough(clewdStream).pipeTo(response) : await fetchAPI.body.pipeThrough(clewdStream).pipeTo(response);
-/******************************** */
-                    try {
-                        await deleteChat(Conversation.uuid);
-                    } catch (err) {
-                        console.log(`[33mdeleteChat failed[0m`);
-                    }
-/******************************** */
                 } catch (err) {
                     if ('AbortError' === err.name) {
                         res.end();
@@ -801,11 +799,12 @@ const updateParams = res => {
                     clewdStream.empty();
                 }
 /******************************** */
-                /*if (prevImpersonated) {
+                //if (prevImpersonated) {
                     try {
                         await deleteChat(Conversation.uuid);
-                    } catch (err) {}
-                }*/
+                    } catch (err) {//}
+                        console.log(`[33mdeleteChat failed[0m`);
+                }
                 changer && CookieChanger.emit('ChangeCookie');
 /******************************** */
             }));
