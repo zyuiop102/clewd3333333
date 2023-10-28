@@ -694,7 +694,7 @@ const updateParams = res => {
                             } //
                         }));
                         return {
-                            prompt: genericFixes(prompt.join('')).trim(),
+                            prompt: prompt.join('').trim(),//genericFixes(prompt.join('')).trim(),
                             systems
                         };
                     })(messages, type);
@@ -703,6 +703,7 @@ const updateParams = res => {
 /****************************************************************/
                     Config.Settings.xmlPlot && (prompt = xmlPlot(prompt));
                     Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
+                    prompt = genericFixes(prompt);
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
 /****************************************************************/
                     Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
