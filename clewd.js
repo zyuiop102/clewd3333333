@@ -113,6 +113,7 @@ const CookieCleaner = () => {
         } catch (error) {}
         content = content.replace(match[0], '');
     }
+    content = genericFixes(content);
 
     //二次role合并
     if (!MergeDisable) {
@@ -694,9 +695,8 @@ const updateParams = res => {
                     console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
 /****************************************************************/
-                    Config.Settings.xmlPlot && (prompt = xmlPlot(prompt));
+                    prompt = Config.Settings.xmlPlot ? xmlPlot(prompt) : genericFixes(prompt);
                     Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
-                    prompt = genericFixes(prompt);
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
 /****************************************************************/
                     Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
@@ -714,9 +714,9 @@ const updateParams = res => {
                                 file_type: 'txt'  //'text/plain'
                             });
                             prompt = 'r' === type ? Config.PromptExperimentFirst : Config.PromptExperimentNext;
-/****************************************************************/                            
+/****************************************************************/
                             splitedprompt.length > 1 && (prompt = prompt + splitedprompt[1]);
-/****************************************************************/                            
+/****************************************************************/
                         }
                         let res;
                         const body = {
@@ -782,7 +782,7 @@ const updateParams = res => {
                     prevImpersonated = clewdStream.impersonated;
                     setTitle('ok ' + bytesToSize(clewdStream.size));
                     //console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
-/******************************** */                    
+/******************************** */
                     429 == fetchAPI.status ? console.log(`[35mExceeded limit![0m\n`) : console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
                     changeflag += 1;
                     if (Config.CookieArray?.length > 0 && (429 == fetchAPI.status || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
