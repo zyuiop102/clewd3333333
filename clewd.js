@@ -816,7 +816,7 @@ const updateParams = res => {
       default:
         req.url !== '/' && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
         res.json(
-            `${Main}\n\n完全开源、免费且禁止商用\n\n使用以上地址+'/v1'作为反代地址\n\nFAQ: https://rentry.org/teralomaniac_clewd`
+            `${Main}\n\n完全开源、免费且禁止商用\n\n使用以上地址+'/v1'作为反代地址\n\n教程与FAQ: https://rentry.org/teralomaniac_clewd（并非反代地址）`
             /*{
             error: {
                 message: '404 Not Found',
