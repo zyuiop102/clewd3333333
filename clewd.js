@@ -814,7 +814,7 @@ const updateParams = res => {
         break;
 
       default:
-        req.url !== '/' && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
+        req.url !== '/' && req.url !== '/v1' && req.url !== '/favicon.ico' && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
         res.writeHead(200,{'Content-Type': 'text/html'});
         const home = '<!DOCTYPE html>'+
         '<html>'+
