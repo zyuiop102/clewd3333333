@@ -814,10 +814,10 @@ const updateParams = res => {
         break;
 
       default:
-        req.url !== '/' && req.url !== '/v1' && req.url !== '/favicon.ico' && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
-        res.writeHead(200,{'Content-Type': 'text/html'});
-        const home = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\n\nfunction copyLink(event) {\n  event.preventDefault();\n  var link = window.location.href + 'v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反代地址: <a href="/v1" onclick="copyLink(event)">点击复制</a><br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`;
-        res.write(home);
+        !['/', '/v1', '/favicon.ico'].includes(req.url) && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        const homepage = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反代地址: <a href="/v1" onclick="copyLink(event)">点击复制</a><br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`;
+        res.write(homepage);
         res.end();
         /*res.json(
             {
