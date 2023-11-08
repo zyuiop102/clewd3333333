@@ -13,6 +13,7 @@ const events = require('events'), CookieChanger = new events.EventEmitter();
 require('events').EventEmitter.defaultMaxListeners = 0;
 
 CookieChanger.on('ChangeCookie', () => {
+    changeflag = 0;
     Proxy && Proxy.close();
     console.log(`Changing Cookie...\n`);
     Proxy.listen(Config.Port, Config.Ip, onListen);
@@ -113,7 +114,7 @@ const CookieCleaner = () => {
         } catch (error) {}
         content = content.replace(match[0], '');
     }
-    content = genericFixes(content);
+    content = content.replace(/(\r\n|\r|\\n)/gm, '\n');
 
     //二次role合并
     if (!MergeDisable) {
@@ -343,7 +344,10 @@ const updateParams = res => {
     const Banned = abuseTag.gateValue === 'true' && abuseTag.gate === 'segment:abuse';
     const Remain = accountInfo.messageLimit?.remaining;
     const Exceededlimit = (accountInfo.messageLimit?.type === 'approaching_limit' && Remain === 0) || accountInfo.messageLimit?.type === 'exceeded_limit';
-    Remain && (changeflag = Math.max(Config.Cookiecounter - Remain, changeflag));
+    if (Remain) {
+        changeflag = Math.max(Config.Cookiecounter - Remain, changeflag);
+        console.log(`[33mApproachingLimit!: Remain ${Remain}[0m`);
+    }
     if ((Overlap || Unverified || Banned) && Config.CookieArray?.length > 0) {
         Overlap ? console.log(`[31mOverlap![0m`) : Unverified ? console.log(`[31mUnverified![0m`) : Banned && console.log(`[31mBanned![0m`);
         CookieCleaner();
@@ -733,7 +737,7 @@ const updateParams = res => {
                             headers
                         });
                         updateParams(res);
-                        await checkResErr(res);
+                        await checkResErr(res, CookieChanger);
                         return res;
                     })(signal, model, prompt, temperature, type));
                     const response = Writable.toWeb(res);
@@ -763,7 +767,7 @@ const updateParams = res => {
                         });
                     }
                 }
-                clearInterval(titleTimer);              
+                clearInterval(titleTimer);
                 if (clewdStream) {
                     clewdStream.censored && console.warn('[33mlikely your account is hard-censored[0m');
                     prevImpersonated = clewdStream.impersonated;
@@ -780,10 +784,10 @@ const updateParams = res => {
                 }
 /******************************** */
                 //if (prevImpersonated) {
-                    try {
-                        await deleteChat(Conversation.uuid);
-                    } catch (err) {//}
-                        console.log(`[33mdeleteChat failed[0m`);
+                try {
+                    await deleteChat(Conversation.uuid);
+                } catch (err) { //}
+                    console.log(`[33mdeleteChat failed[0m`);
                 }
                 changer && CookieChanger.emit('ChangeCookie');
 /******************************** */
