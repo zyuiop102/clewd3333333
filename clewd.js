@@ -155,7 +155,7 @@ const CookieCleaner = () => {
     
     //<card>消除空XML tags、两端空白符和多余的\n
     content = content.replace(/\s*<\|curtail\|>\s*/g, '\n');
-    content = content.replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '');
+    content = content.replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '\n');
     content = content.replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>');
     content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '');
     content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '');
@@ -176,7 +176,7 @@ const ConfigPath = joinP(__dirname, './config.js'), LogPath = joinP(__dirname, '
 let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonated = false, Config = {
     Cookie: '',
     CookieArray: [],
-    Cookiecounter: 0,
+    Cookiecounter: 3,
     CookieIndex: 0,
     ProxyPassword: '',
     Ip: (process.env.Cookie || process.env.CookieArray) ? '0.0.0.0' : '127.0.0.1',
@@ -737,7 +737,7 @@ const updateParams = res => {
                             headers
                         });
                         updateParams(res);
-                        await checkResErr(res, CookieChanger);
+                        await checkResErr(res, CookieChanger); //await checkResErr(res);
                         return res;
                     })(signal, model, prompt, temperature, type));
                     const response = Writable.toWeb(res);
