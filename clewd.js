@@ -13,6 +13,7 @@ const events = require('events'), CookieChanger = new events.EventEmitter();
 require('events').EventEmitter.defaultMaxListeners = 0;
 
 CookieChanger.on('ChangeCookie', () => {
+    changeflag = 0;
     Proxy && Proxy.close();
     console.log(`Changing Cookie...\n`);
     Proxy.listen(Config.Port, Config.Ip, onListen);
@@ -77,18 +78,18 @@ const CookieCleaner = () => {
     const MergeAssistantDisable = content.includes('<\!-- Merge Assistant Disable -->');
     if (!MergeDisable) {
         if (content.includes('<\!-- Merge System Disable -->') || !card) {
-            content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '$1');
+            content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
         }
         if (!MergeHumanDisable) {
-            content = content.replace(/(\n\n|^)xmlPlot:/g, '$1Human:');
-            content = content.replace(/(?:\n\n|^)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
+            content = content.replace(/(\n\n|^\s*)xmlPlot:/g, '$1Human:');
+            content = content.replace(/(?:\n\n|^\s*)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
             content = content.replace(/^\s*Human:\s*/, '');
         }
         if (!MergeAssistantDisable) {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
         }
     }
-    content = content.replace(/(\n\n|^)xmlPlot:\s*/gm, '$1');
+    content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
     content = content.replace(/<\!-- Merge.*?Disable -->/gm, '');
 
     //自定义插入
@@ -113,12 +114,12 @@ const CookieCleaner = () => {
         } catch (error) {}
         content = content.replace(match[0], '');
     }
-    content = genericFixes(content);
+    content = content.replace(/(\r\n|\r|\\n)/gm, '\n');
 
     //二次role合并
     if (!MergeDisable) {
         if (!MergeHumanDisable) {
-            content = content.replace(/(?:\n\n|^)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
+            content = content.replace(/(?:\n\n|^\s*)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
         }
         if (!MergeAssistantDisable) {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
@@ -154,7 +155,7 @@ const CookieCleaner = () => {
     
     //<card>消除空XML tags、两端空白符和多余的\n
     content = content.replace(/\s*<\|curtail\|>\s*/g, '\n');
-    content = content.replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '');
+    content = content.replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '\n');
     content = content.replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>');
     content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '');
     content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '');
@@ -175,7 +176,7 @@ const ConfigPath = joinP(__dirname, './config.js'), LogPath = joinP(__dirname, '
 let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonated = false, Config = {
     Cookie: '',
     CookieArray: [],
-    Cookiecounter: 0,
+    Cookiecounter: 3,
     CookieIndex: 0,
     ProxyPassword: '',
     Ip: (process.env.Cookie || process.env.CookieArray) ? '0.0.0.0' : '127.0.0.1',
@@ -319,7 +320,7 @@ const updateParams = res => {
     setTitle('ok');
     updateParams(accRes);
 /**************************** */
-    const accountRes = await fetch(Config.rProxy + '/api/account', {
+    const accountRes = await fetch(Config.rProxy + '/api/auth/current_account', {
         method: 'GET',
         headers: {
             ...AI.hdr(),
@@ -331,17 +332,23 @@ const updateParams = res => {
 /**************************** */
     console.log(Config.CookieArray?.length > 0 ? `(index: [36m${currentIndex || Config.CookieArray.length}[0m) Logged in %o` : 'Logged in %o', { //console.log('Logged in %o', {
         name: accInfo.name?.split('@')?.[0],
-        mail: accountInfo.email_address, //
+        mail: accountInfo.account.email_address, //
         capabilities: accInfo.capabilities,
     });
     uuidOrg = accInfo?.uuid;
 /************************* */
-    const Overlap = (uuidOrgArray.includes(uuidOrg) && percentage <= 100);
+    const Overlap = uuidOrgArray.includes(uuidOrg) && percentage <= 100 && Config.CookieArray?.length > 0;
     !Overlap && uuidOrgArray.push(uuidOrg);
-    const Unverified = (!accountInfo.completed_verification_at);
-    const abuseTag = accountInfo.statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0];
-    const Banned = (abuseTag.gateValue === 'true' && abuseTag.gate === 'segment:abuse');
-    if (Overlap || Unverified || Banned) {
+    const Unverified = !accountInfo.account.completed_verification_at;
+    const abuseTag = accountInfo.account.statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0];
+    const Banned = abuseTag.gateValue === 'true' && abuseTag.gate === 'segment:abuse';
+    const Remain = accountInfo.messageLimit?.remaining;
+    const Exceededlimit = (accountInfo.messageLimit?.type === 'approaching_limit' && Remain === 0) || accountInfo.messageLimit?.type === 'exceeded_limit';
+    if (Remain) {
+        changeflag = Math.max(Config.Cookiecounter - Remain, changeflag);
+        console.log(`[33mApproachingLimit!: Remain ${Remain}[0m`);
+    }
+    if ((Overlap || Unverified || Banned) && Config.CookieArray?.length > 0) {
         Overlap ? console.log(`[31mOverlap![0m`) : Unverified ? console.log(`[31mUnverified![0m`) : Banned && console.log(`[31mBanned![0m`);
         CookieCleaner();
         Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
@@ -379,34 +386,18 @@ const updateParams = res => {
         })(flag.type))));
 /***************************** */
         if (Config.CookieArray?.length > 0) {
-            console.log(`${'consumer_banned' === flagtype ? '[31mBanned' : '[35mRestricted'}![0m`); //console.log(`[35mRestricted![0m`);
+            console.log(`${'consumer_banned' === flagtype ? '[31mBanned' : '[35mRestricted'}![0m`);
             'consumer_banned' === flagtype && CookieCleaner();
             Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
             return CookieChanger.emit('ChangeCookie');
         }
     }
     if (Config.Cookiecounter < 0) {
-        console.log('');
+        console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
         return CookieChanger.emit('ChangeCookie');
-    }
-    if (Config.CookieArray.length > 0) {
-        const allRes = await fetch(`${Config.rProxy}`, {
-            headers: {
-                ...AI.hdr(),
-                Cookie: getCookies()
-            },
-            method: 'GET'
-        });
-        await checkResErr(allRes);
-        const allInfo = await allRes.text();
-        const Exceededlimit = /\\"messageLimit\\":{\\"type\\":\\"(approaching_limit\\",\\"remaining\\":0|exceeded_limit)\\",/.test(allInfo);
-        const Remain = /\\"messageLimit\\":{\\"type\\":\\"approaching_limit\\",\\"remaining\\":\d+\\",/.exec(allInfo);
-        Remain && (changeflag = Math.max(Config.Cookiecounter - Remain[0], changeflag));
-        Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m`);
-        if (Exceededlimit) {
-            console.log(`[35mExceeded limit![0m\n`);
-            return CookieChanger.emit('ChangeCookie');
-        }
+    } else if (Exceededlimit) {
+        console.log(`[35mExceeded limit![0m\n`);
+        return CookieChanger.emit('ChangeCookie');
 /***************************** */
     }
     const convRes = await fetch(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations`, {
@@ -675,13 +666,13 @@ const updateParams = res => {
                                 return message.content;
                             }
                             let spacing = '';
-/****************************************************************/
+/******************************** */
                             if (Config.Settings.xmlPlot) {
                                 idx > 0 && (spacing = '\n\n');
                                 const prefix = message.customname ? message.role + ': <customname>' + message.name + '</customname>: ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : 'xmlPlot: ' + Replacements[message.role];
                                 return `${spacing}${prefix}${message.customname ? '<reply>\n' + message.content.trim() + '\n</reply>' : message.content}`;
                             } else {
-/****************************************************************/
+/******************************** */
                                 idx > 0 && (spacing = systemMessages.includes(message) ? '\n' : '\n\n');
                                 const prefix = message.customname ? message.name + ': ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
                                 return `${spacing}${message.strip ? '' : prefix}${'system' === message.role ? message.content : message.content.trim()}`;
@@ -694,19 +685,19 @@ const updateParams = res => {
                     })(messages, type);
                     console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
-/****************************************************************/
+/******************************** */
                     prompt = Config.Settings.xmlPlot ? xmlPlot(prompt) : genericFixes(prompt);
                     Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
-/****************************************************************/
+/******************************** */
                     Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
                         const attachments = [];
                         if (Config.Settings.PromptExperiments) {
-/****************************************************************/
+/******************************** */
                             let splitedprompt = prompt.split('\n\nPlainPrompt:');
                             prompt = splitedprompt[0];
-/****************************************************************/
+/******************************** */
                             attachments.push({
                                 extracted_content: (prompt),
                                 file_name: 'paste.txt',  //fileName(),
@@ -714,9 +705,9 @@ const updateParams = res => {
                                 file_type: 'txt'  //'text/plain'
                             });
                             prompt = 'r' === type ? Config.PromptExperimentFirst : Config.PromptExperimentNext;
-/****************************************************************/
+/******************************** */
                             splitedprompt.length > 1 && (prompt = prompt + splitedprompt[1]);
-/****************************************************************/
+/******************************** */
                         }
                         let res;
                         const body = {
@@ -746,7 +737,7 @@ const updateParams = res => {
                             headers
                         });
                         updateParams(res);
-                        await checkResErr(res);
+                        await checkResErr(res, CookieChanger); //await checkResErr(res);
                         return res;
                     })(signal, model, prompt, temperature, type));
                     const response = Writable.toWeb(res);
@@ -776,14 +767,13 @@ const updateParams = res => {
                         });
                     }
                 }
-                clearInterval(titleTimer);              
+                clearInterval(titleTimer);
                 if (clewdStream) {
                     clewdStream.censored && console.warn('[33mlikely your account is hard-censored[0m');
                     prevImpersonated = clewdStream.impersonated;
                     setTitle('ok ' + bytesToSize(clewdStream.size));
-                    //console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
+                    429 == fetchAPI.status ? console.log(`[35mExceeded limit![0m\n`) : console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`); //console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
 /******************************** */
-                    429 == fetchAPI.status ? console.log(`[35mExceeded limit![0m\n`) : console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
                     changeflag += 1;
                     if (Config.CookieArray?.length > 0 && (429 == fetchAPI.status || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
                         changeflag = 0;
@@ -794,10 +784,10 @@ const updateParams = res => {
                 }
 /******************************** */
                 //if (prevImpersonated) {
-                    try {
-                        await deleteChat(Conversation.uuid);
-                    } catch (err) {//}
-                        console.log(`[33mdeleteChat failed[0m`);
+                try {
+                    await deleteChat(Conversation.uuid);
+                } catch (err) { //}
+                    console.log(`[33mdeleteChat failed[0m`);
                 }
                 changer && CookieChanger.emit('ChangeCookie');
 /******************************** */
@@ -814,10 +804,10 @@ const updateParams = res => {
         break;
 
       default:
-        req.url !== '/' && req.url !== '/v1' && req.url !== '/favicon.ico' && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
-        res.writeHead(200,{'Content-Type': 'text/html'});
-        const home = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\n\nfunction copyLink(event) {\n  event.preventDefault();\n  var link = window.location.href + 'v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反代地址: <a href="/v1" onclick="copyLink(event)">点击复制</a><br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`;
-        res.write(home);
+        !['/', '/v1', '/favicon.ico'].includes(req.url) && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        const homepage = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反代地址: <a href="v1" onclick="copyLink(event)">点击复制</a><br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`;
+        res.write(homepage);
         res.end();
         /*res.json(
             {
