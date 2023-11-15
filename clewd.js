@@ -666,13 +666,13 @@ const updateParams = res => {
                                 return message.content;
                             }
                             let spacing = '';
-/****************************************************************/
+/******************************** */
                             if (Config.Settings.xmlPlot) {
                                 idx > 0 && (spacing = '\n\n');
                                 const prefix = message.customname ? message.role + ': <customname>' + message.name + '</customname>: ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : 'xmlPlot: ' + Replacements[message.role];
                                 return `${spacing}${prefix}${message.customname ? '<reply>\n' + message.content.trim() + '\n</reply>' : message.content}`;
                             } else {
-/****************************************************************/
+/******************************** */
                                 idx > 0 && (spacing = systemMessages.includes(message) ? '\n' : '\n\n');
                                 const prefix = message.customname ? message.name + ': ' : 'system' !== message.role || message.name ? Replacements[message.name || message.role] + ': ' : '' + Replacements[message.role];
                                 return `${spacing}${message.strip ? '' : prefix}${'system' === message.role ? message.content : message.content.trim()}`;
@@ -685,19 +685,19 @@ const updateParams = res => {
                     })(messages, type);
                     console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
-/****************************************************************/
+/******************************** */
                     prompt = Config.Settings.xmlPlot ? xmlPlot(prompt) : genericFixes(prompt);
                     Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
-/****************************************************************/
+/******************************** */
                     Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
                         const attachments = [];
                         if (Config.Settings.PromptExperiments) {
-/****************************************************************/
+/******************************** */
                             let splitedprompt = prompt.split('\n\nPlainPrompt:');
                             prompt = splitedprompt[0];
-/****************************************************************/
+/******************************** */
                             attachments.push({
                                 extracted_content: (prompt),
                                 file_name: 'paste.txt',  //fileName(),
@@ -705,9 +705,9 @@ const updateParams = res => {
                                 file_type: 'txt'  //'text/plain'
                             });
                             prompt = 'r' === type ? Config.PromptExperimentFirst : Config.PromptExperimentNext;
-/****************************************************************/
+/******************************** */
                             splitedprompt.length > 1 && (prompt = prompt + splitedprompt[1]);
-/****************************************************************/
+/******************************** */
                         }
                         let res;
                         const body = {
