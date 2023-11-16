@@ -7,7 +7,7 @@
 const {createServer: Server, IncomingMessage, ServerResponse} = require('node:http'), {createHash: Hash, randomUUID, randomInt, randomBytes} = require('node:crypto'), {TransformStream, ReadableStream} = require('node:stream/web'), {Readable, Writable} = require('node:stream'), {Blob} = require('node:buffer'), {existsSync: exists, writeFileSync: write, createWriteStream} = require('node:fs'), {join: joinP} = require('node:path'), {ClewdSuperfetch: Superfetch, SuperfetchAvailable} = require('./lib/clewd-superfetch'), {AI, fileName, genericFixes, bytesToSize, setTitle, checkResErr, Replacements, Main} = require('./lib/clewd-utils'), ClewdStream = require('./lib/clewd-stream');
 
 /******************************************************* */
-let currentIndex, Firstlogin = true, changeflag = 0, changetime = 0, totaltime, uuidOrgArray = [];
+let currentIndex, Firstlogin = true, changeflag = 0, changetime = 0, totaltime, uuidOrgArray = [], model;
 
 const events = require('events'), CookieChanger = new events.EventEmitter();
 require('events').EventEmitter.defaultMaxListeners = 0;
@@ -337,6 +337,8 @@ const updateParams = res => {
     });
     uuidOrg = accInfo?.uuid;
 /************************* */
+    model = accountInfo.account.statsig.values.dynamic_configs["6zA9wvTedwkzjLxWy9PVe7yydI00XDQ6L5Fejjq/2o8="]?.value?.model;
+    model === 'claude-2.0-magenta' && console.log(`[33mMagenta![0m`);
     const Overlap = uuidOrgArray.includes(uuidOrg) && percentage <= 100 && Config.CookieArray?.length > 0;
     !Overlap && uuidOrgArray.push(uuidOrg);
     const Unverified = !accountInfo.account.completed_verification_at;
@@ -496,7 +498,7 @@ const updateParams = res => {
                         console.log('[33mhaving[0m [1mAllSamples[0m and [1mNoSamples[0m both set to true is not supported');
                         throw Error('Only one can be used at the same time: AllSamples/NoSamples');
                     }
-                    const model = AI.mdl();
+                    //const model = AI.mdl();
                     curPrompt = {
                         firstUser: messages.find((message => 'user' === message.role)),
                         firstSystem: messages.find((message => 'system' === message.role)),
