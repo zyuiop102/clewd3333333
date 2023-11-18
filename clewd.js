@@ -339,6 +339,13 @@ const updateParams = res => {
 /************************* */
     model = accountInfo.account.statsig.values.dynamic_configs["6zA9wvTedwkzjLxWy9PVe7yydI00XDQ6L5Fejjq/2o8="]?.value?.model;
     model === 'claude-2.0-magenta' && console.log(`[33mMagenta![0m`);
+    if (model != 'claude-2.0-magenta' && Config.Cookiecounter === -201) {
+        CookieCleaner();
+        return CookieChanger.emit('ChangeCookie');
+    } else if (model != 'claude-2' && Config.Cookiecounter === -2) {
+        CookieCleaner();
+        return CookieChanger.emit('ChangeCookie');
+    }
     const Overlap = uuidOrgArray.includes(uuidOrg) && percentage <= 100 && Config.CookieArray?.length > 0;
     !Overlap && uuidOrgArray.push(uuidOrg);
     const Unverified = !accountInfo.account.completed_verification_at;
@@ -808,7 +815,7 @@ const updateParams = res => {
       default:
         !['/', '/v1', '/favicon.ico'].includes(req.url) && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
         res.writeHead(200, {'Content-Type': 'text/html'});
-        const homepage = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反代地址: <a href="v1" onclick="copyLink(event)">点击复制</a><br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`;
+        const homepage = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反向代理: <a href="v1" onclick="copyLink(event)">点击复制链接</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude-2模型（酒馆需打开Show "External" models）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`;
         res.write(homepage);
         res.end();
         /*res.json(
