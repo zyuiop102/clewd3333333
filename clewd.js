@@ -46,7 +46,7 @@ const CookieCleaner = () => {
         const bytes = randomInt(5, 15);
         var placeholder = randomBytes(bytes).toString('hex');
     }
-    let count = Math.floor((Config.Settings.padtxt - simpletokenizer(content)) / simpletokenizer(placeholder)); 
+    let count = Math.max(100, Math.floor((Config.Settings.padtxt - simpletokenizer(content)) / simpletokenizer(placeholder))); 
 
     // 生成占位符字符串
     let padding = '';
