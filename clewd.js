@@ -29,7 +29,7 @@ const CookieCleaner = () => {
 }, padtxt = content => {
     const {encode} = require('gpt-tokenizer');
     const placeholder = Config.padtxt_placeholder || randomBytes(randomInt(5, 15)).toString('hex');
-    let count = Math.max(105, Math.floor((Config.Settings.padtxt * 1.05 - encode(content).length) / encode(placeholder).length)); 
+    let count = Math.floor(Math.max(1000, Math.floor(Config.Settings.padtxt - encode(content).length)) / encode(placeholder).length); 
     let padding = '';
     for (let i = 0; i < count; i++) {
         padding += placeholder;
@@ -760,14 +760,18 @@ const updateParams = res => {
 /******************************** */
                     clewdStream.empty();
                 }
-/******************************** */
-                //if (prevImpersonated) {
-                try {
+                /*if (prevImpersonated) {
                     await deleteChat(Conversation.uuid);
-                } catch (err) { //}
-                    console.log(`[33mdeleteChat failed[0m`);
-                }
-                changer && CookieChanger.emit('ChangeCookie');
+                }*/
+/******************************** */
+                setTimeout(function() {
+                    try {
+                        deleteChat(Conversation.uuid);
+                    } catch (err) {
+                        console.log(`[33mdeleteChat failed[0m`);
+                    }
+                    changer && CookieChanger.emit('ChangeCookie');
+                }, 1000);
 /******************************** */
             }));
         })(req, res);
