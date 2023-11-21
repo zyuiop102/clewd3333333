@@ -26,42 +26,19 @@ const CookieCleaner = () => {
     Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
     !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
     currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
-}, simpletokenizer = (prompt) => {
-    let byteLength = 0;
-    for (let i = 0; i < prompt.length; i++) {
-        let code = prompt.charCodeAt(i);
-        if (code <= 0xFF) {
-            byteLength += 0.6;
-        } else if (code <= 0xFFFF) {
-            byteLength += 1;
-        } else {
-            byteLength += 1.5;
-        }
-    }
-    return byteLength;
-}, padtxt = (content) => {
-    if (Config.padtxt_placeholder.length > 0) {
-        var placeholder = Config.padtxt_placeholder;
-    } else {
-        const bytes = randomInt(5, 15);
-        var placeholder = randomBytes(bytes).toString('hex');
-    }
-    let count = Math.max(100, Math.floor((Config.Settings.padtxt - simpletokenizer(content)) / simpletokenizer(placeholder))); 
-
-    // 生成占位符字符串
+}, padtxt = content => {
+    const {encode} = require('gpt-tokenizer');
+    const placeholder = Config.padtxt_placeholder || randomBytes(randomInt(5, 15)).toString('hex');
+    let count = Math.max(105, Math.floor((Config.Settings.padtxt * 1.05 - encode(content).length) / encode(placeholder).length)); 
     let padding = '';
     for (let i = 0; i < count; i++) {
         padding += placeholder;
     }
-
-    // 在prompt前面添加占位符, 在末尾增加空行然后添加prompt
     content = padding + '\n\n\n' + content;
-
     return content.trim();
-}, xmlPlot = (content) => {
+}, xmlPlot = content => {
     // 检查内容中是否包含"<card>"
     const card = content.includes('<card>');
-
     //<card>越狱倒置
     if (card) {
         let segcontentHuman = content.split('\n\nHuman:');
@@ -71,7 +48,6 @@ const CookieCleaner = () => {
         }
         content = segcontentHuman.join('\n\nHuman:');
     }
-
     //role合并
     const MergeDisable = content.includes('<\!-- Merge Disable -->');
     const MergeHumanDisable = content.includes('<\!-- Merge Human Disable -->');
@@ -91,7 +67,6 @@ const CookieCleaner = () => {
     }
     content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
     content = content.replace(/<\!-- Merge.*?Disable -->/gm, '');
-
     //自定义插入
     content = content.replace(/(<\/?)PrevAssistant>/gm, '$1@1>');
     content = content.replace(/(<\/?)PrevHuman>/gm, '$1@2>');
@@ -106,7 +81,6 @@ const CookieCleaner = () => {
     }
     content = splitContent.join('\n\n');
     content = content.replace(/<@(\d+)>.*?<\/@\1>/gs, '');
-
     //正则
     while ((match = /<regex>"(\/?)(.*)\1(.*)" *: *"(.*?)"<\/regex>/gm.exec(content)) !== null) {
         try {
@@ -115,7 +89,6 @@ const CookieCleaner = () => {
         content = content.replace(match[0], '');
     }
     content = content.replace(/(\r\n|\r|\\n)/gm, '\n');
-
     //二次role合并
     if (!MergeDisable) {
         if (!MergeHumanDisable) {
@@ -125,7 +98,6 @@ const CookieCleaner = () => {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
         }
     }
-
     //Plain Prompt
     let segcontentHuman = content.split('\n\nHuman:');
     let segcontentlastIndex = segcontentHuman.length - 1;
@@ -134,7 +106,6 @@ const CookieCleaner = () => {
     }
     content = content.replace(/<\!-- Plain Prompt Enable -->/gm, '');
     content = content.replace(/\n\nHuman: *PlainPrompt:/, '\n\nPlainPrompt:');
-
     //<card>群组
     if (!card) {
         content = content.replace(/(<reply>\n|\n<\/reply>)/g, '');
@@ -143,7 +114,6 @@ const CookieCleaner = () => {
         content = content.replace(/(<reply>\n|\n<\/reply>)\1*/g, '$1');
         content = content.replace(/<customname>(.*?)<\/customname>:/gm, '$1:\n');
     }
-
     //<card>在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>\n\n<plot>\n\n"
     const cardtag = content.match(/(?=\n\n<\/card>)/) || '</card>';
     const exampletag = content.match(/(?=\n\n<\/example>)/) || '</example>';
@@ -152,7 +122,6 @@ const CookieCleaner = () => {
     const lastChatStart = content.lastIndexOf('\n\n[Start a new');
     firstChatStart != -1 && firstChatStart === lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
     firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}\n\n${plot}` + content.slice(lastChatStart));
-    
     //<card>消除空XML tags、两端空白符和多余的\n
     content = content.replace(/\s*<\|curtail\|>\s*/g, '\n');
     content = content.replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '\n');
@@ -815,8 +784,7 @@ const updateParams = res => {
       default:
         !['/', '/v1', '/favicon.ico'].includes(req.url) && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
         res.writeHead(200, {'Content-Type': 'text/html'});
-        const homepage = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反向代理: <a href="v1" onclick="copyLink(event)">点击复制链接</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude-2模型（酒馆需打开Show "External" models）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`;
-        res.write(homepage);
+        res.write(`<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反向代理: <a href="v1" onclick="copyLink(event)">点击复制链接</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude-2模型（酒馆需打开Show "External" models）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`);
         res.end();
         /*res.json(
             {
