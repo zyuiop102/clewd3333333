@@ -35,5 +35,8 @@
   "bugs": {
     "url": "https://gitgud.io/ahsk/clewd/-/issues"
   },
-  "dependencies": {"localtunnel": "^2.0.2"}
+  "dependencies": {
+    "localtunnel": "^2.0.2",
+    "gpt-tokenizer": "^2.1.2"
+  }
 }
