@@ -29,7 +29,7 @@ const CookieCleaner = () => {
 }, padtxt = content => {
     const {encode} = require('gpt-tokenizer');
     const placeholder = Config.padtxt_placeholder || randomBytes(randomInt(5, 15)).toString('hex');
-    let count = Math.floor(Math.max(1000, Math.floor(Config.Settings.padtxt - encode(content).length)) / encode(placeholder).length); 
+    let count = Math.floor(Math.max(1000, Config.Settings.padtxt - encode(content).length) / encode(placeholder).length); 
     let padding = '';
     for (let i = 0; i < count; i++) {
         padding += placeholder;
