@@ -221,14 +221,18 @@ const updateParams = res => {
     if (Config.Settings.PreserveChats) {
         return;
     }
-    const res = await fetch(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations/${uuid}`, {
-        headers: {
-            ...AI.hdr(),
-            Cookie: getCookies()
-        },
-        method: 'DELETE'
-    });
-    updateParams(res);
+    try { //
+        const res = await fetch(`${Config.rProxy}/api/organizations/${uuidOrg}/chat_conversations/${uuid}`, {
+            headers: {
+                ...AI.hdr(),
+                Cookie: getCookies()
+            },
+            method: 'DELETE'
+        });
+        updateParams(res);
+    } catch (err) { //
+        console.log(`[33mdeleteChat failed[0m`); //
+    } //
 }, onListen = async () => {
 /***************************** */
     if (Firstlogin) {
@@ -307,11 +311,8 @@ const updateParams = res => {
     uuidOrg = accInfo?.uuid;
 /************************* */
     model = accountInfo.account.statsig.values.dynamic_configs["6zA9wvTedwkzjLxWy9PVe7yydI00XDQ6L5Fejjq/2o8="]?.value?.model;
-    model === 'claude-2.0-magenta' && console.log(`[33mMagenta![0m`);
-    if (model != 'claude-2.0-magenta' && Config.Cookiecounter === -201) {
-        CookieCleaner();
-        return CookieChanger.emit('ChangeCookie');
-    } else if (model != 'claude-2' && Config.Cookiecounter === -2) {
+    model != AI.mdl() && console.log(`[33m${model}[0m`);
+    if (model != AI.mdl() && Config.Cookiecounter === -2) {
         CookieCleaner();
         return CookieChanger.emit('ChangeCookie');
     }
@@ -386,16 +387,7 @@ const updateParams = res => {
         }
     }), conversations = await convRes.json();
     updateParams(convRes);
-    //conversations.length > 0 && await Promise.all(conversations.map((conv => deleteChat(conv.uuid))));
-/************************* */
-    if (conversations.length > 0) {
-        try {
-            await Promise.all(conversations.map((conv => deleteChat(conv.uuid))));
-        } catch (err) {
-            console.log(`[33mdeleteChat failed[0m`);
-        }
-    }
-/************************* */
+    conversations.length > 0 && await Promise.all(conversations.map((conv => deleteChat(conv.uuid))));
 }, writeSettings = async (config, firstRun = false) => {
     write(ConfigPath, `/*\n* https://rentry.org/teralomaniac_clewd\n* https://github.com/teralomaniac/clewd\n*/\n\n// SET YOUR COOKIE BELOW\n\nmodule.exports = ${JSON.stringify(config, null, 4)}\n\n/*\n BufferSize\n * How many characters will be buffered before the AI types once\n * lower = less chance of \`PreventImperson\` working properly\n\n ---\n\n SystemInterval\n * How many messages until \`SystemExperiments alternates\`\n\n ---\n\n Other settings\n * https://gitgud.io/ahsk/clewd/#defaults\n * and\n * https://gitgud.io/ahsk/clewd/-/blob/master/CHANGELOG.md\n */`.trim().replace(/((?<!\r)\n|\r(?!\n))/g, '\r\n'));
     if (firstRun) {
@@ -439,8 +431,8 @@ const updateParams = res => {
                     const body = JSON.parse(Buffer.concat(buffer).toString()), temperature = Math.max(.1, Math.min(1, body.temperature));
                     let {messages} = body;
 /************************* */
-                    const kHeaders = Object.getOwnPropertySymbols(req).find(symbol => symbol.toString() === 'Symbol(kHeaders)');
-                    if (Config.ProxyPassword != '' && req[kHeaders]?.authorization != 'Bearer ' + Config.ProxyPassword) {
+                    const authorization = Object.fromEntries(Object.entries(req.headers).map(([key, value]) => [key, value])).authorization;
+                    if (Config.ProxyPassword != '' && authorization != 'Bearer ' + Config.ProxyPassword) {
                         throw Error('ProxyPassword Wrong');
                     }
 /************************* */
@@ -764,14 +756,8 @@ const updateParams = res => {
                     await deleteChat(Conversation.uuid);
                 }*/
 /******************************** */
-                setTimeout(function() {
-                    try {
-                        deleteChat(Conversation.uuid);
-                    } catch (err) {
-                        console.log(`[33mdeleteChat failed[0m`);
-                    }
-                    changer && CookieChanger.emit('ChangeCookie');
-                }, 1000);
+                await deleteChat(Conversation.uuid);
+                changer && CookieChanger.emit('ChangeCookie');
 /******************************** */
             }));
         })(req, res);
