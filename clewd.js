@@ -7,7 +7,7 @@
 const {createServer: Server, IncomingMessage, ServerResponse} = require('node:http'), {createHash: Hash, randomUUID, randomInt, randomBytes} = require('node:crypto'), {TransformStream, ReadableStream} = require('node:stream/web'), {Readable, Writable} = require('node:stream'), {Blob} = require('node:buffer'), {existsSync: exists, writeFileSync: write, createWriteStream} = require('node:fs'), {join: joinP} = require('node:path'), {ClewdSuperfetch: Superfetch, SuperfetchAvailable} = require('./lib/clewd-superfetch'), {AI, fileName, genericFixes, bytesToSize, setTitle, checkResErr, Replacements, Main} = require('./lib/clewd-utils'), ClewdStream = require('./lib/clewd-stream');
 
 /******************************************************* */
-let currentIndex, Firstlogin = true, changeflag = 0, changetime = 0, totaltime, uuidOrgArray = [], model, tokens, tokenspadtxt;
+let currentIndex, Firstlogin = true, changeflag = 0, changetime = 0, totaltime, uuidOrgArray = [], model, tokens, tokenspadtxt, apiKey;
 
 const events = require('events'), CookieChanger = new events.EventEmitter();
 require('events').EventEmitter.defaultMaxListeners = 0;
@@ -30,13 +30,15 @@ const CookieCleaner = () => {
     const {countTokens} = require('@anthropic-ai/tokenizer');
     const placeholder = Config.padtxt_placeholder || randomBytes(randomInt(5, 15)).toString('hex');
     tokens = countTokens(content);
-    let count = Math.floor(Math.max(1000, Config.Settings.padtxt - tokens) / countTokens(placeholder)); 
-    let padding = '';
-    for (let i = 0; i < count; i++) {
-        padding += placeholder;
+    if (!apiKey) {
+        let count = Math.floor(Math.max(1000, Config.Settings.padtxt - tokens) / countTokens(placeholder)); 
+        let padding = '';
+        for (let i = 0; i < count; i++) {
+            padding += placeholder;
+        }
+        content = padding + '\n\n\n' + content;
+        tokenspadtxt = countTokens(content);
     }
-    content = padding + '\n\n\n' + content;
-    tokenspadtxt = countTokens(content);
     return content.trim();
 }, xmlPlot = content => {
     // 检查内容中是否包含"<card>"
@@ -55,13 +57,14 @@ const CookieCleaner = () => {
     const MergeHumanDisable = content.includes('<\!-- Merge Human Disable -->');
     const MergeAssistantDisable = content.includes('<\!-- Merge Assistant Disable -->');
     if (!MergeDisable) {
-        if (content.includes('<\!-- Merge System Disable -->') || !card) {
+        if (content.includes('<\!-- Merge System Disable -->')) {
             content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
         }
         if (!MergeHumanDisable) {
+            const Human = /^\s*Human:/.test(content);
             content = content.replace(/(\n\n|^\s*)xmlPlot:/g, '$1Human:');
             content = content.replace(/(?:\n\n|^\s*)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
-            content = content.replace(/^\s*Human:\s*/, '');
+            !apiKey && !Human && (content = content.replace(/^\s*Human:\s*/, ''));
         }
         if (!MergeAssistantDisable) {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
@@ -156,6 +159,7 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
     BufferSize: 1,
     SystemInterval: 3,
     rProxy: AI.end(),
+    api_rProxy: '',
     padtxt_placeholder: '',
     PromptExperimentFirst: '',
     PromptExperimentNext: '',
@@ -394,7 +398,7 @@ const updateParams = res => {
 /***************************** */
     } catch (err) {
         console.error('[33mClewd:[0m\n%o', err);
-        CookieChanger.emit('ChangeCookie');
+        Config.CookieArray?.length > 0 && CookieChanger.emit('ChangeCookie');
     }
 /***************************** */
 }, writeSettings = async (config, firstRun = false) => {
@@ -416,8 +420,18 @@ const updateParams = res => {
     switch (req.url) {
       case '/v1/models':
         res.json({
+            object: 'list', //
             data: [ {
-                id: AI.mdl()
+                id: 'claude-2.1'                },{ //id: AI.mdl()
+                id: 'claude-2.0'                },{ //
+                id: 'claude-v1.3'               },{ //
+                id: 'claude-v1.3-100k'          },{ //
+                id: 'claude-v1.2'               },{ //
+                id: 'claude-v1.0'               },{ //
+                id: 'claude-instant-1.2'        },{ //
+                id: 'claude-instant-v1.1'       },{ //
+                id: 'claude-instant-v1.1-100k'  },{ //
+                id: 'claude-instant-v1.0'           //   
             } ]
         });
         break;
@@ -441,7 +455,14 @@ const updateParams = res => {
                     let {messages} = body;
 /************************* */
                     const authorization = Object.fromEntries(Object.entries(req.headers).map(([key, value]) => [key, value])).authorization;
-                    if (Config.ProxyPassword != '' && authorization != 'Bearer ' + Config.ProxyPassword) {
+                    apiKey = /(?<=^Bearer \s*)sk-ant-api[\w-]*(?=\s*)$/.exec(authorization);
+                    let api_max_tokens, api_model;
+                    if (apiKey) {
+                        apiKey = apiKey[0]
+                        api_max_tokens = body.max_tokens;
+                        api_model = body.model;
+                    }
+                    if (!apiKey && Config.ProxyPassword != '' && authorization != 'Bearer ' + Config.ProxyPassword) {
                         throw Error('ProxyPassword Wrong');
                     }
 /************************* */
@@ -500,7 +521,7 @@ const updateParams = res => {
                     retryRegen = Config.Settings.RetryRegenerate && samePrompt && null != Conversation.uuid;
                     samePrompt || (prevMessages = JSON.parse(JSON.stringify(messages)));
                     let type = '';
-                    if (retryRegen) {
+                    if (retryRegen && !apiKey) { //(retryRegen) {
                         type = 'R';
                         fetchAPI = await (async (signal, model) => {
                             let res;
@@ -534,7 +555,7 @@ const updateParams = res => {
                             await checkResErr(res);
                             return res;
                         })(signal, model);
-                    } else if (shouldRenew) {
+                    } else if (shouldRenew && !apiKey) { //(shouldRenew) {
                         Conversation.uuid && await deleteChat(Conversation.uuid);
                         fetchAPI = await (async signal => {
                             Conversation.uuid = randomUUID().toString();
@@ -556,7 +577,7 @@ const updateParams = res => {
                             return res;
                         })(signal);
                         type = 'r';
-                    } else if (samePrompt) {} else {
+                    } else if (samePrompt && !apiKey) {} else { //(samePrompt) {} else {
                         const systemExperiment = !Config.Settings.RenewAlways && Config.Settings.SystemExperiments;
                         if (!systemExperiment || systemExperiment && Conversation.depth >= Config.SystemInterval) {
                             type = 'c-r';
@@ -566,6 +587,7 @@ const updateParams = res => {
                             Conversation.depth++;
                         }
                     }
+                    apiKey && (type = 'api'); //
                     let {prompt, systems} = ((messages, type) => {
                         const rgxScenario = /^\[Circumstances and context of the dialogue: ([\s\S]+?)\.?\]$/i, rgxPerson = /^\[([\s\S]+?)'s personality: ([\s\S]+?)\]$/i, messagesClone = JSON.parse(JSON.stringify(messages)), realLogs = messagesClone.filter((message => [ 'user', 'assistant' ].includes(message.role))), sampleLogs = messagesClone.filter((message => message.name)), mergedLogs = [ ...sampleLogs, ...realLogs ];
                         mergedLogs.forEach(((message, idx) => {
@@ -631,7 +653,7 @@ const updateParams = res => {
                             message.customname || delete message.name;
                         }));
                         let systems = [];
-                        if (![ 'r', 'R' ].includes(type)) {
+                        if (![ 'r', 'R', 'api' ].includes(type)) { //if (![ 'r', 'R' ].includes(type)) {
                             lastUser.strip = true;
                             systemMessages.forEach((message => message.discard = message.discard || 'c-c' === type ? !message.jailbreak : !message.jailbreak && !message.main));
                             systems = systemMessages.filter((message => !message.discard)).map((message => `"${message.content.substring(0, 25).replace(/\n/g, '\\n').trim()}..."`));
@@ -662,15 +684,38 @@ const updateParams = res => {
                             systems
                         };
                     })(messages, type);
-                    console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
+                    console.log(`${apiKey ? api_model : model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`); //console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
 /******************************** */
                     prompt = Config.Settings.xmlPlot ? xmlPlot(prompt) : genericFixes(prompt);
-                    Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
+                    !apiKey && Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
 /******************************** */
-                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### [Tokens: ${tokens}/${tokenspadtxt}] REPLY:\n`); //REPLY:\n`);
+                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### [Tokens: ${tokens}${Config.Settings.padtxt && !apiKey ? '/'+ tokenspadtxt: ''}] REPLY:\n`); //REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
+/******************************** */
+                        if (apiKey) {
+                            prompt = prompt.replace(/^\s*Human:/, '\n\nHuman:');
+                            const res = await fetch(`${Config.api_rProxy ? Config.api_rProxy : 'https://api.anthropic.com'}/v1/complete`, {
+                                method: 'POST',
+                                signal,
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-api-key': apiKey,
+                                    'anthropic-version': '2023-06-01'
+                                },
+                                body: JSON.stringify({
+                                    model: api_model,
+                                    max_tokens_to_sample: api_max_tokens,
+                                    stream: true,
+                                    prompt,
+                                    temperature
+                                }),
+                            });
+                            await checkResErr(res);
+                            return res;
+                        }
+/******************************** */  
                         const attachments = [];
                         if (Config.Settings.PromptExperiments) {
 /******************************** */
@@ -721,7 +766,13 @@ const updateParams = res => {
                     })(signal, model, prompt, temperature, type));
                     const response = Writable.toWeb(res);
                     clewdStream = new ClewdStream({
-                        config: Config,
+                        config: {
+                            ...Config,
+                            Settings: {
+                                ...Config.Settings,
+                                Superfetch: apiKey ? false : Config.Settings.Superfetch
+                            }
+                        }, //config: Config,
                         version: Main,
                         minSize: Config.BufferSize,
                         model,
@@ -730,7 +781,7 @@ const updateParams = res => {
                         source: fetchAPI
                     }, Logger);
                     titleTimer = setInterval((() => setTitle('recv ' + bytesToSize(clewdStream.size))), 300);
-                    Config.Settings.Superfetch ? await Readable.toWeb(fetchAPI.body).pipeThrough(clewdStream).pipeTo(response) : await fetchAPI.body.pipeThrough(clewdStream).pipeTo(response);
+                    (!apiKey && Config.Settings.Superfetch) ? await Readable.toWeb(fetchAPI.body).pipeThrough(clewdStream).pipeTo(response) : await fetchAPI.body.pipeThrough(clewdStream).pipeTo(response); //Config.Settings.Superfetch ? await Readable.toWeb(fetchAPI.body).pipeThrough(clewdStream).pipeTo(response) : await fetchAPI.body.pipeThrough(clewdStream).pipeTo(response);
                 } catch (err) {
                     if ('AbortError' === err.name) {
                         res.end();
@@ -753,10 +804,12 @@ const updateParams = res => {
                     setTitle('ok ' + bytesToSize(clewdStream.size));
                     429 == fetchAPI.status ? console.log(`[35mExceeded limit![0m\n`) : console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`); //console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
 /******************************** */
-                    changeflag += 1;
-                    if (Config.CookieArray?.length > 0 && (429 == fetchAPI.status || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
-                        changeflag = 0;
-                        changer = true;
+                    if(!apiKey) {
+                        changeflag += 1;
+                        if (Config.CookieArray?.length > 0 && (429 == fetchAPI.status || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
+                            changeflag = 0;
+                            changer = true;
+                        }
                     }
 /******************************** */
                     clewdStream.empty();
@@ -765,8 +818,10 @@ const updateParams = res => {
                     await deleteChat(Conversation.uuid);
                 }*/
 /******************************** */
-                await deleteChat(Conversation.uuid);
-                changer && CookieChanger.emit('ChangeCookie');
+                if (!apiKey) {
+                    await deleteChat(Conversation.uuid);
+                    changer && CookieChanger.emit('ChangeCookie');
+                }
 /******************************** */
             }));
         })(req, res);
