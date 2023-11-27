@@ -7,7 +7,7 @@
 const {createServer: Server, IncomingMessage, ServerResponse} = require('node:http'), {createHash: Hash, randomUUID, randomInt, randomBytes} = require('node:crypto'), {TransformStream, ReadableStream} = require('node:stream/web'), {Readable, Writable} = require('node:stream'), {Blob} = require('node:buffer'), {existsSync: exists, writeFileSync: write, createWriteStream} = require('node:fs'), {join: joinP} = require('node:path'), {ClewdSuperfetch: Superfetch, SuperfetchAvailable} = require('./lib/clewd-superfetch'), {AI, fileName, genericFixes, bytesToSize, setTitle, checkResErr, Replacements, Main} = require('./lib/clewd-utils'), ClewdStream = require('./lib/clewd-stream');
 
 /******************************************************* */
-let currentIndex, Firstlogin = true, changeflag = 0, changetime = 0, totaltime, uuidOrgArray = [], model, tokens, tokenspadtxt, apiKey;
+let currentIndex, Firstlogin = true, changeflag = 0, changetime = 0, totaltime, uuidOrgArray = [], model, tokens, apiKey;
 
 const events = require('events'), CookieChanger = new events.EventEmitter();
 require('events').EventEmitter.defaultMaxListeners = 0;
@@ -22,7 +22,12 @@ CookieChanger.on('ChangeCookie', () => {
     }));
 });
 
-const CookieCleaner = () => {
+const convertToType = value => {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    if (/^\d+$/.test(value)) return parseInt(value);
+    return value;
+}, CookieCleaner = () => {
     Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
     !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
     currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
@@ -30,16 +35,8 @@ const CookieCleaner = () => {
     const {countTokens} = require('@anthropic-ai/tokenizer');
     const placeholder = Config.padtxt_placeholder || randomBytes(randomInt(5, 15)).toString('hex');
     tokens = countTokens(content);
-    if (!apiKey) {
-        let count = Math.floor(Math.max(1000, Config.Settings.padtxt - tokens) / countTokens(placeholder)); 
-        let padding = '';
-        for (let i = 0; i < count; i++) {
-            padding += placeholder;
-        }
-        content = padding + '\n\n\n' + content;
-        tokenspadtxt = countTokens(content);
-    }
-    return content.trim();
+    !apiKey && (content = placeholder.repeat(Math.floor(Math.max(1000, Config.Settings.padtxt - tokens) / countTokens(placeholder.trim()))) + '\n\n\n' + content.trim());
+    return content;
 }, xmlPlot = content => {
     // 检查内容中是否包含"<card>"
     const card = content.includes('<card>');
@@ -135,7 +132,7 @@ const CookieCleaner = () => {
     content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
-    return content.trim();
+    return content.trim().replace(/^\s*Human:/, '\n\nHuman:');
 };
 /******************************************************* */
 
@@ -285,8 +282,7 @@ const updateParams = res => {
         CookieCleaner();
         console.log(`[31mExpired![0m`);
         Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
-        CookieChanger.emit('ChangeCookie');
-        return;
+        return CookieChanger.emit('ChangeCookie');
     }
 /**************************** */
     await checkResErr(accRes);
@@ -308,7 +304,7 @@ const updateParams = res => {
         }
     });
     await checkResErr(accountRes);
-    const accountInfo = (await accountRes.json());
+    const accountInfo = await accountRes.json();
 /**************************** */
     console.log(Config.CookieArray?.length > 0 ? `(index: [36m${currentIndex || Config.CookieArray.length}[0m) Logged in %o` : 'Logged in %o', { //console.log('Logged in %o', {
         name: accInfo.name?.split('@')?.[0],
@@ -378,11 +374,8 @@ const updateParams = res => {
             return CookieChanger.emit('ChangeCookie');
         }
     }
-    if (Config.Cookiecounter < 0) {
-        console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
-        return CookieChanger.emit('ChangeCookie');
-    } else if (Exceededlimit) {
-        console.log(`[35mExceeded limit![0m\n`);
+    if (Config.Cookiecounter < 0 || Exceededlimit) {
+        console.log(Config.Cookiecounter < 0 ? `[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n` : '[35mExceeded limit![0m\n');
         return CookieChanger.emit('ChangeCookie');
 /***************************** */
     }
@@ -420,18 +413,19 @@ const updateParams = res => {
     switch (req.url) {
       case '/v1/models':
         res.json({
-            object: 'list', //
             data: [ {
-                id: 'claude-2.1'                },{ //id: AI.mdl()
-                id: 'claude-2.0'                },{ //
-                id: 'claude-v1.3'               },{ //
-                id: 'claude-v1.3-100k'          },{ //
-                id: 'claude-v1.2'               },{ //
-                id: 'claude-v1.0'               },{ //
-                id: 'claude-instant-1.2'        },{ //
-                id: 'claude-instant-v1.1'       },{ //
-                id: 'claude-instant-v1.1-100k'  },{ //
-                id: 'claude-instant-v1.0'           //   
+/***************************** */
+                id: 'claude-2.1'                },{
+                id: 'claude-2.0'                },{
+                id: 'claude-v1.3'               },{
+                id: 'claude-v1.3-100k'          },{
+                id: 'claude-v1.2'               },{
+                id: 'claude-v1.0'               },{
+                id: 'claude-instant-1.2'        },{
+                id: 'claude-instant-v1.1'       },{
+                id: 'claude-instant-v1.1-100k'  },{
+                id: 'claude-instant-v1.0'       //id: AI.mdl()
+/***************************** */
             } ]
         });
         break;
@@ -439,7 +433,7 @@ const updateParams = res => {
       case '/v1/chat/completions':
         ((req, res) => {
             setTitle('recv...');
-            let fetchAPI, changer; //let fetchAPI;
+            let fetchAPI;
             const abortControl = new AbortController, {signal} = abortControl;
             res.socket.on('close', (async () => {
                 abortControl.signal.aborted || abortControl.abort();
@@ -454,15 +448,13 @@ const updateParams = res => {
                     const body = JSON.parse(Buffer.concat(buffer).toString()), temperature = Math.max(.1, Math.min(1, body.temperature));
                     let {messages} = body;
 /************************* */
-                    const authorization = Object.fromEntries(Object.entries(req.headers).map(([key, value]) => [key, value])).authorization;
-                    apiKey = /(?<=^Bearer \s*)sk-ant-api[\w-]*(?=\s*)$/.exec(authorization);
+                    apiKey = /(?<=^Bearer \s*)sk-ant-api[\w-]*(?=\s*)$/.exec(req.headers.authorization);
                     let api_max_tokens, api_model;
                     if (apiKey) {
-                        apiKey = apiKey[0]
+                        apiKey = apiKey[0];
                         api_max_tokens = body.max_tokens;
                         api_model = body.model;
-                    }
-                    if (!apiKey && Config.ProxyPassword != '' && authorization != 'Bearer ' + Config.ProxyPassword) {
+                    } else if (Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
                         throw Error('ProxyPassword Wrong');
                     }
 /************************* */
@@ -521,7 +513,7 @@ const updateParams = res => {
                     retryRegen = Config.Settings.RetryRegenerate && samePrompt && null != Conversation.uuid;
                     samePrompt || (prevMessages = JSON.parse(JSON.stringify(messages)));
                     let type = '';
-                    if (retryRegen && !apiKey) { //(retryRegen) {
+                    if (apiKey) { type = 'api'; } else if (retryRegen) { //if (retryRegen) {
                         type = 'R';
                         fetchAPI = await (async (signal, model) => {
                             let res;
@@ -555,7 +547,7 @@ const updateParams = res => {
                             await checkResErr(res);
                             return res;
                         })(signal, model);
-                    } else if (shouldRenew && !apiKey) { //(shouldRenew) {
+                    } else if (shouldRenew) {
                         Conversation.uuid && await deleteChat(Conversation.uuid);
                         fetchAPI = await (async signal => {
                             Conversation.uuid = randomUUID().toString();
@@ -577,7 +569,7 @@ const updateParams = res => {
                             return res;
                         })(signal);
                         type = 'r';
-                    } else if (samePrompt && !apiKey) {} else { //(samePrompt) {} else {
+                    } else if (samePrompt) {} else {
                         const systemExperiment = !Config.Settings.RenewAlways && Config.Settings.SystemExperiments;
                         if (!systemExperiment || systemExperiment && Conversation.depth >= Config.SystemInterval) {
                             type = 'c-r';
@@ -587,7 +579,6 @@ const updateParams = res => {
                             Conversation.depth++;
                         }
                     }
-                    apiKey && (type = 'api'); //
                     let {prompt, systems} = ((messages, type) => {
                         const rgxScenario = /^\[Circumstances and context of the dialogue: ([\s\S]+?)\.?\]$/i, rgxPerson = /^\[([\s\S]+?)'s personality: ([\s\S]+?)\]$/i, messagesClone = JSON.parse(JSON.stringify(messages)), realLogs = messagesClone.filter((message => [ 'user', 'assistant' ].includes(message.role))), sampleLogs = messagesClone.filter((message => message.name)), mergedLogs = [ ...sampleLogs, ...realLogs ];
                         mergedLogs.forEach(((message, idx) => {
@@ -596,16 +587,16 @@ const updateParams = res => {
                             if (next && !Config.Settings.xmlPlot) { //if (next) {
                                 if ('name' in message && 'name' in next) {
                                     if (message.name === next.name) {
-                                        message.content += '\n\n' + next.content; //message.content += '\n' + next.content;
+                                        message.content += '\n' + next.content;
                                         next.merged = true;
                                     }
                                 } else if ('system' !== next.role) {
                                     if (next.role === message.role) {
-                                        message.content += '\n\n' + next.content; //message.content += '\n' + next.content;
+                                        message.content += '\n' + next.content;
                                         next.merged = true;
                                     }
                                 } else {
-                                    message.content += '\n\n' + next.content; //message.content += '\n' + next.content;
+                                    message.content += '\n' + next.content;
                                     next.merged = true;
                                 }
                             }
@@ -653,7 +644,7 @@ const updateParams = res => {
                             message.customname || delete message.name;
                         }));
                         let systems = [];
-                        if (![ 'r', 'R', 'api' ].includes(type)) { //if (![ 'r', 'R' ].includes(type)) {
+                        if (![ 'r', 'R', 'api' ].includes(type)) {
                             lastUser.strip = true;
                             systemMessages.forEach((message => message.discard = message.discard || 'c-c' === type ? !message.jailbreak : !message.jailbreak && !message.main));
                             systems = systemMessages.filter((message => !message.discard)).map((message => `"${message.content.substring(0, 25).replace(/\n/g, '\\n').trim()}..."`));
@@ -680,7 +671,7 @@ const updateParams = res => {
                             } //
                         }));
                         return {
-                            prompt: prompt.join('').trim(),//genericFixes(prompt.join('')).trim(),
+                            prompt: prompt.join('').trim(), //genericFixes(prompt.join('')).trim(),
                             systems
                         };
                     })(messages, type);
@@ -691,11 +682,10 @@ const updateParams = res => {
                     !apiKey && Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
 /******************************** */
-                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### [Tokens: ${tokens}${Config.Settings.padtxt && !apiKey ? '/'+ tokenspadtxt: ''}] REPLY:\n`); //REPLY:\n`);
+                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### [Tokens: ${tokens}] REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
 /******************************** */
                         if (apiKey) {
-                            prompt = prompt.replace(/^\s*Human:/, '\n\nHuman:');
                             const res = await fetch(`${Config.api_rProxy ? Config.api_rProxy : 'https://api.anthropic.com'}/v1/complete`, {
                                 method: 'POST',
                                 signal,
@@ -715,13 +705,11 @@ const updateParams = res => {
                             await checkResErr(res);
                             return res;
                         }
-/******************************** */  
+/******************************** */
                         const attachments = [];
                         if (Config.Settings.PromptExperiments) {
-/******************************** */
-                            let splitedprompt = prompt.split('\n\nPlainPrompt:');
-                            prompt = splitedprompt[0];
-/******************************** */
+                            let splitedprompt = prompt.split('\n\nPlainPrompt:'); //
+                            prompt = splitedprompt[0]; //
                             attachments.push({
                                 extracted_content: (prompt),
                                 file_name: 'paste.txt',  //fileName(),
@@ -729,9 +717,7 @@ const updateParams = res => {
                                 file_type: 'txt'  //'text/plain'
                             });
                             prompt = 'r' === type ? Config.PromptExperimentFirst : Config.PromptExperimentNext;
-/******************************** */
-                            splitedprompt.length > 1 && (prompt = prompt + splitedprompt[1]);
-/******************************** */
+                            splitedprompt.length > 1 && (prompt += splitedprompt[1]); //
                         }
                         let res;
                         const body = {
@@ -803,26 +789,18 @@ const updateParams = res => {
                     prevImpersonated = clewdStream.impersonated;
                     setTitle('ok ' + bytesToSize(clewdStream.size));
                     429 == fetchAPI.status ? console.log(`[35mExceeded limit![0m\n`) : console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`); //console.log(`${200 == fetchAPI.status ? '[32m' : '[33m'}${fetchAPI.status}![0m\n`);
-/******************************** */
-                    if(!apiKey) {
-                        changeflag += 1;
-                        if (Config.CookieArray?.length > 0 && (429 == fetchAPI.status || (Config.Cookiecounter && changeflag >= Config.Cookiecounter))) {
-                            changeflag = 0;
-                            changer = true;
-                        }
-                    }
-/******************************** */
                     clewdStream.empty();
                 }
-                /*if (prevImpersonated) {
+                if (!apiKey) { //if (prevImpersonated) {
                     await deleteChat(Conversation.uuid);
-                }*/
 /******************************** */
-                if (!apiKey) {
-                    await deleteChat(Conversation.uuid);
-                    changer && CookieChanger.emit('ChangeCookie');
+                    changeflag += 1;
+                    if (Config.CookieArray?.length > 0 && (429 == fetchAPI.status || Config.Cookiecounter && changeflag >= Config.Cookiecounter)) {
+                        changeflag = 0;
+                        CookieChanger.emit('ChangeCookie');
+                    }
+/******************************** */
                 }
-/******************************** */
             }));
         })(req, res);
         break;
@@ -838,7 +816,7 @@ const updateParams = res => {
       default:
         !['/', '/v1', '/favicon.ico'].includes(req.url) && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
         res.writeHead(200, {'Content-Type': 'text/html'});
-        res.write(`<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反向代理: <a href="v1" onclick="copyLink(event)">点击复制链接</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude-2模型（酒馆需打开Show "External" models）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a>\n</body>\n</html>`);
+        res.write(`<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反向代理: <a href="v1" onclick="copyLink(event)">点击复制链接</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude模型（酒馆需打开Show "External" models，仅在api模式有模型选择差异）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a><br/><br/><br/>请举报恶意盗用/商用本教程及Clewd修改版的这个B 站up<a href="https://space.bilibili.com/35307060" target="FAQ">浅睡一天一夜</a>\n</body>\n</html>`);
         res.end();
         /*res.json(
             {
@@ -883,38 +861,21 @@ const updateParams = res => {
             Config.Cookie = 'SET YOUR COOKIE HERE';
             writeSettings(Config, true);
         }
-/***************************** */
-        function convertToType(value) {
-            if (value === "true") return true;
-            if (value === "false") return false;
-            if (/^\d+$/.test(value)) return parseInt(value);
-            return value;
-        }
-        for (let key in Config) {
-            if (key === 'Settings') {
-                for (let setting in Config.Settings) {
-                    Config.Settings[setting] = convertToType(process.env[setting]) ?? Config.Settings[setting];
-                }
-            } else {
-                Config[key] = key === 'CookieArray' ? (process.env[key]?.split(',')?.map(x => x.replace(/[\[\]"\s]/g, '')) ?? Config[key]) : (convertToType(process.env[key]) ?? Config[key]);
-            }
-        }
-/***************************** */
     })();
 /***************************** */
-    !Config.rProxy && (Config.rProxy = AI.end());
-    Config.rProxy.endsWith('/') && (Config.rProxy = Config.rProxy.slice(0, -1));
-    let uniqueArr = [], seen = new Set();
-    for (let Cookie of Config.CookieArray) {
-        !/^sessionKey=/.test(Cookie) && (Cookie += 'sessionKey=');
-        if (!seen.has(Cookie)) {
-            uniqueArr.push(Cookie);
-            seen.add(Cookie);
+    for (let key in Config) {
+        if (key === 'Settings') {
+            for (let setting in Config.Settings) {
+                Config.Settings[setting] = convertToType(process.env[setting]) ?? Config.Settings[setting];
+            }
+        } else {
+            Config[key] = key === 'CookieArray' ? (process.env[key]?.split(',')?.map(x => x.replace(/[\[\]"\s]/g, '')) ?? Config[key]) : (convertToType(process.env[key]) ?? Config[key]);
         }
     }
-    Config.CookieArray = uniqueArr;
+    Config.rProxy = Config.rProxy.endsWith('/') ? Config.rProxy.slice(0, -1) : Config.rProxy || AI.end();
+    Config.CookieArray = [...new Set(Config.CookieArray)];
     !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
-    currentIndex = Config.CookieIndex > 0 ? Config.CookieIndex - 1 : Config.Cookiecounter >= 0 ? Math.floor(Math.random()*Config.CookieArray.length) : 0;
+    currentIndex = Config.CookieIndex > 0 ? Config.CookieIndex - 1 : Config.Cookiecounter >= 0 ? Math.floor(Math.random() * Config.CookieArray.length) : 0;
 /***************************** */
     Proxy.listen(Config.Port, Config.Ip, onListen);
     Proxy.on('error', (err => {
