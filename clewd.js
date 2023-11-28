@@ -37,7 +37,7 @@ const convertToType = value => {
     tokens = countTokens(content);
     !apiKey && (content = placeholder.repeat(Math.floor(Math.max(1000, Config.Settings.padtxt - tokens) / countTokens(placeholder.trim()))) + '\n\n\n' + content.trim());
     return content;
-}, xmlPlot = content => {
+}, xmlPlot = (content, nonsys = false) => {
     // 检查内容中是否包含"<card>"
     const card = content.includes('<card>');
     //<card>越狱倒置
@@ -58,10 +58,8 @@ const convertToType = value => {
             content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
         }
         if (!MergeHumanDisable) {
-            const Human = /^\s*Human:/.test(content);
-            content = content.replace(/(\n\n|^\s*)xmlPlot:/g, '$1Human:');
+            nonsys ? content = content.replace(/(\n\n|^\s*)xmlPlot:/g, '\n\nHuman:') : content = content.replace(/(?<!\n\n(Human|Assistant):.*?)(\n\n|^\s*)xmlPlot:\s*/gs, '$1');
             content = content.replace(/(?:\n\n|^\s*)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
-            !apiKey && !Human && (content = content.replace(/^\s*Human:\s*/, ''));
         }
         if (!MergeAssistantDisable) {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
@@ -132,7 +130,8 @@ const convertToType = value => {
     content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '');
     content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '');
     content = content.replace(/(?<=\n)\n(?=\n)/g, '');
-    return content.trim().replace(/^\s*Human:/, '\n\nHuman:');
+    //确保格式正确
+    return apiKey ? content.trim().replace(/^Human:/, '\n\nHuman:') : content.trim().replace(/^Human:|\n\nAssistant:$/g, '');
 };
 /******************************************************* */
 
@@ -678,11 +677,13 @@ const updateParams = res => {
                     console.log(`${apiKey ? api_model : model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`); //console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
 /******************************** */
-                    prompt = Config.Settings.xmlPlot ? xmlPlot(prompt) : genericFixes(prompt);
-                    !apiKey && Config.Settings.FullColon && (prompt = prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
+                    prompt = Config.Settings.xmlPlot ? xmlPlot(prompt, api_model && api_model != 'claude-2.1') : genericFixes(prompt);
+                    Config.Settings.FullColon && (prompt = apiKey
+                        ? prompt.replace(/(\n\nAssistant|\n\nHuman):/, function(match, p1) {return p1 === '\n\nHuman' ? match : p1 + '：'}).replace(/(\n\nAssistant|\n\nHuman):(?=.*?$)/, function(match, p1) {return p1 === '\n\nAssistant' ? match : p1 + '：'})
+                        : prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
 /******************************** */
-                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### [Tokens: ${tokens}] REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
+                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${apiKey ? api_model : model} PROMPT (${type}):\n${prompt}\n--\n####### [Tokens: ${tokens}] REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
 /******************************** */
                         if (apiKey) {
@@ -872,7 +873,7 @@ const updateParams = res => {
             Config[key] = key === 'CookieArray' ? (process.env[key]?.split(',')?.map(x => x.replace(/[\[\]"\s]/g, '')) ?? Config[key]) : (convertToType(process.env[key]) ?? Config[key]);
         }
     }
-    Config.rProxy = Config.rProxy.endsWith('/') ? Config.rProxy.slice(0, -1) : Config.rProxy || AI.end();
+    Config.rProxy = Config.rProxy ? Config.rProxy.replace(/\/$/, '') : AI.end();
     Config.CookieArray = [...new Set(Config.CookieArray)];
     !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
     currentIndex = Config.CookieIndex > 0 ? Config.CookieIndex - 1 : Config.Cookiecounter >= 0 ? Math.floor(Math.random() * Config.CookieArray.length) : 0;
