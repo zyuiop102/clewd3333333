@@ -38,17 +38,7 @@ const convertToType = value => {
     !apiKey && (content = placeholder.repeat(Math.floor(Math.max(1000, Config.Settings.padtxt - tokens) / countTokens(placeholder.trim()))) + '\n\n\n' + content.trim());
     return content;
 }, xmlPlot = (content, nonsys = false) => {
-    // 检查内容中是否包含"<card>"
     const card = content.includes('<card>');
-    //<card>越狱倒置
-    if (card) {
-        let segcontentHuman = content.split('\n\nHuman:');
-        const seglength = segcontentHuman.length;
-        if (/Assistant: *.$/.test(content) && seglength > 1 && !segcontentHuman[seglength - 2].includes('\n\nAssistant:')) {
-            segcontentHuman[seglength - 2] = segcontentHuman.splice(seglength - 1, 1, segcontentHuman[seglength - 2])[0];
-        }
-        content = segcontentHuman.join('\n\nHuman:');
-    }
     //role合并
     const MergeDisable = content.includes('<\!-- Merge Disable -->');
     const MergeHumanDisable = content.includes('<\!-- Merge Human Disable -->');
@@ -65,11 +55,9 @@ const convertToType = value => {
             content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
         }
     }
-    content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
-    content = content.replace(/<\!-- Merge.*?Disable -->/gm, '');
+    content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1').replace(/<\!-- Merge.*?Disable -->/gm, '');
     //自定义插入
-    content = content.replace(/(<\/?)PrevAssistant>/gm, '$1@1>');
-    content = content.replace(/(<\/?)PrevHuman>/gm, '$1@2>');
+    content = content.replace(/(<\/?)PrevAssistant>/gm, '$1@1>').replace(/(<\/?)PrevHuman>/gm, '$1@2>');
     let splitContent = content.split(/\n\n(?=Assistant:|Human:)/g);
     let match;
     while ((match = /<@(\d+)>(.*?)<\/@\1>/gs.exec(content)) !== null) {
@@ -101,18 +89,15 @@ const convertToType = value => {
     //Plain Prompt
     let segcontentHuman = content.split('\n\nHuman:');
     let segcontentlastIndex = segcontentHuman.length - 1;
-    if (segcontentlastIndex >= 2 && segcontentHuman[segcontentlastIndex].includes('<!-- Plain Prompt Enable -->') && !content.includes('\n\nPlainPrompt:')) {
-        content = segcontentHuman.slice(0, segcontentlastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + segcontentHuman.slice(segcontentlastIndex).join('\n\nHuman:');
+    if (!apiKey && segcontentlastIndex >= 2 && segcontentHuman[segcontentlastIndex].includes('<!-- Plain Prompt Enable -->') && !content.includes('\n\nPlainPrompt:')) {
+        content = segcontentHuman.slice(0, segcontentlastIndex).join('\n\nHuman:') + '\n\nPlainPrompt:' + segcontentHuman.slice(segcontentlastIndex).join('\n\nHuman:').replace(/\n\nHuman: *PlainPrompt:/, '\n\nPlainPrompt:');
     }
     content = content.replace(/<\!-- Plain Prompt Enable -->/gm, '');
-    content = content.replace(/\n\nHuman: *PlainPrompt:/, '\n\nPlainPrompt:');
     //<card>群组
     if (!card) {
-        content = content.replace(/(<reply>\n|\n<\/reply>)/g, '');
-        return content.replace(/<customname>(.*?)<\/customname>/gm, '$1');
+        return content.replace(/(<reply>\n|\n<\/reply>)/g, '').replace(/<customname>(.*?)<\/customname>/gm, '$1');
     } else {
-        content = content.replace(/(<reply>\n|\n<\/reply>)\1*/g, '$1');
-        content = content.replace(/<customname>(.*?)<\/customname>:/gm, '$1:\n');
+        content = content.replace(/(<reply>\n|\n<\/reply>)\1*/g, '$1').replace(/<customname>(.*?)<\/customname>:/gm, '$1:\n');
     }
     //<card>在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>\n\n<plot>\n\n"
     const cardtag = content.match(/(?=\n\n<\/card>)/) || '</card>';
@@ -123,15 +108,23 @@ const convertToType = value => {
     firstChatStart != -1 && firstChatStart === lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
     firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}\n\n${plot}` + content.slice(lastChatStart));
     //<card>消除空XML tags、两端空白符和多余的\n
-    content = content.replace(/\s*<\|curtail\|>\s*/g, '\n');
-    content = content.replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '\n');
-    content = content.replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>');
-    content = content.replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '');
-    content = content.replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '');
-    content = content.replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '');
-    content = content.replace(/(?<=\n)\n(?=\n)/g, '');
+    content = content.replace(/\s*<\|curtail\|>\s*/g, '\n')
+        .replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '\n')
+        .replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>')
+        .replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '')
+        .replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '')
+        .replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '')
+        .replace(/(?<=\n)\n(?=\n)/g, '');
     //确保格式正确
-    return apiKey ? content.trim().replace(/^Human:/, '\n\nHuman:') : content.trim().replace(/^Human:|\n\nAssistant:$/g, '');
+    if (apiKey) {
+        content = content.trim().replace(/^Human:/, '\n\nHuman:')
+            .replace(/(\n\nAssistant|\n\nHuman):(?!.*?\n\n(Assistant|Human):).*$/s, function(match, p1) {return p1 === '\n\nAssistant' ? match : match + '\n\nAssistant: '})
+            .replace(/\s*<\|noAssistant\|>\s*(.*?)(?:\n\nAssistant:)?$/s, '\n\n$1');
+        content.includes('<|reverseHA|>') && (content = content.replace(/\s*<\|reverseHA\|>\s*/g, '\n\n').replace(/\n\n(Assistant|Human):/g, function(match, p1) {return p1 === 'Human' ? '\n\nAssistant:' : '\n\nHuman:'}))
+        return content;
+    } else {
+        return content.trim().replace(/^Human:|\n\nAssistant:$/g, '');
+    }
 };
 /******************************************************* */
 
@@ -677,9 +670,9 @@ const updateParams = res => {
                     console.log(`${apiKey ? api_model : model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`); //console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
 /******************************** */
-                    prompt = Config.Settings.xmlPlot ? xmlPlot(prompt, api_model && api_model != 'claude-2.1') : genericFixes(prompt);
+                    prompt = Config.Settings.xmlPlot ? xmlPlot(prompt, api_model && api_model != 'claude-2.1') : apiKey ? `\n\nHuman: ${genericFixes(prompt)}\n\nAssistant: ` : genericFixes(prompt);
                     Config.Settings.FullColon && (prompt = apiKey
-                        ? prompt.replace(/(\n\nAssistant|\n\nHuman):/, function(match, p1) {return p1 === '\n\nHuman' ? match : p1 + '：'}).replace(/(\n\nAssistant|\n\nHuman):(?=.*?$)/, function(match, p1) {return p1 === '\n\nAssistant' ? match : p1 + '：'})
+                        ? prompt.replace(/(\n\nAssistant|\n\nHuman):/, function(match, p1) {return p1 === '\n\nHuman' ? match : p1 + '：'}).replace(/(\n\nAssistant|\n\nHuman):(?!.*?\n\n(Assistant|Human):)/s, function(match, p1) {return p1 === '\n\nAssistant' ? match : p1 + '：'})
                         : prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
 /******************************** */
@@ -817,7 +810,7 @@ const updateParams = res => {
       default:
         !['/', '/v1', '/favicon.ico'].includes(req.url) && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
         res.writeHead(200, {'Content-Type': 'text/html'});
-        res.write(`<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>反向代理: <a href="v1" onclick="copyLink(event)">点击复制链接</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude模型（酒馆需打开Show "External" models，仅在api模式有模型选择差异）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">https://rentry.org/teralomaniac_clewd</a><br/><br/><br/>请举报恶意盗用/商用本教程及Clewd修改版的这个B 站up<a href="https://space.bilibili.com/35307060" target="FAQ">浅睡一天一夜</a>\n</body>\n</html>`);
+        res.write(`<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>点击复制反向代理: <a href="v1" onclick="copyLink(event)">Copy Link</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude模型（酒馆需打开Show "External" models，仅在api模式有模型选择差异）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">Rentry</a> | <a href="https://discord.com/invite/B7Wr25Z7BZ" target="FAQ">Discord</a><br/><br/><br/>请举报恶意盗用/商用本教程及Clewd修改版的这个B 站up<a href="https://space.bilibili.com/35307060" target="FAQ">浅睡一天一夜</a>\n</body>\n</html>`);
         res.end();
         /*res.json(
             {
