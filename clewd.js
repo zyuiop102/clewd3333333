@@ -29,7 +29,7 @@ const convertToType = value => {
     return value;
 }, CookieCleaner = () => {
     Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
-    !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
+    writeSettings(Config);
     currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
 }, padtxt = content => {
     const {countTokens} = require('@anthropic-ai/tokenizer');
@@ -387,6 +387,7 @@ const updateParams = res => {
     }
 /***************************** */
 }, writeSettings = async (config, firstRun = false) => {
+    if (process.env.Cookie || process.env.CookieArray) return ChangedSettings = '', UnknownSettings = '';
     write(ConfigPath, `/*\n* https://rentry.org/teralomaniac_clewd\n* https://github.com/teralomaniac/clewd\n*/\n\n// SET YOUR COOKIE BELOW\n\nmodule.exports = ${JSON.stringify(config, null, 4)}\n\n/*\n BufferSize\n * How many characters will be buffered before the AI types once\n * lower = less chance of \`PreventImperson\` working properly\n\n ---\n\n SystemInterval\n * How many messages until \`SystemExperiments alternates\`\n\n ---\n\n Other settings\n * https://gitgud.io/ahsk/clewd/#defaults\n * and\n * https://gitgud.io/ahsk/clewd/-/blob/master/CHANGELOG.md\n */`.trim().replace(/((?<!\r)\n|\r(?!\n))/g, '\r\n'));
     if (firstRun) {
         console.warn('[33mconfig file created!\nedit[0m [1mconfig.js[0m [33mto set your settings and restart the program[0m');
@@ -868,7 +869,7 @@ const updateParams = res => {
     }
     Config.rProxy = Config.rProxy ? Config.rProxy.replace(/\/$/, '') : AI.end();
     Config.CookieArray = [...new Set(Config.CookieArray)];
-    !process.env.Cookie && !process.env.CookieArray && writeSettings(Config);
+    writeSettings(Config);
     currentIndex = Config.CookieIndex > 0 ? Config.CookieIndex - 1 : Config.Cookiecounter >= 0 ? Math.floor(Math.random() * Config.CookieArray.length) : 0;
 /***************************** */
     Proxy.listen(Config.Port, Config.Ip, onListen);
