@@ -23,12 +23,13 @@ CookieChanger.on('ChangeCookie', () => {
 });
 
 const convertToType = value => {
-    if (value === "true") return true;
-    if (value === "false") return false;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
     if (/^\d+$/.test(value)) return parseInt(value);
     return value;
 }, CookieCleaner = () => {
-    Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
+    Config.CookieArray.splice(Config.CookieArray.indexOf(Config.Cookie), 1);
+    Config.Cookie = '';
     writeSettings(Config);
     currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
 }, padtxt = content => {
@@ -49,7 +50,7 @@ const convertToType = value => {
             content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
         }
         if (!MergeHumanDisable) {
-            nonsys ? content = content.replace(/(\n\n|^\s*)xmlPlot:/g, '\n\nHuman:') : content = content.replace(/(\n\n|^\s*)(?<!\n\n(Human|Assistant):.*?)xmlPlot:\s*/gs, '$1');
+            nonsys ? content = content.replace(/(\n\n|^\s*)xmlPlot:/g, '\n\nHuman:') : content = content.replace(/(\n\n|^\s*)(?<!\n\n(Human|Assistant):.*?)xmlPlot:\s*/gs, '$1').replace(/(\n\n|^\s*)xmlPlot:/g, '\n\nHuman:');
             content = content.replace(/(?:\n\n|^\s*)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
         }
         if (!MergeAssistantDisable) {
@@ -99,19 +100,11 @@ const convertToType = value => {
     } else {
         content = content.replace(/(<reply>\n|\n<\/reply>)\1*/g, '$1').replace(/<customname>(.*?)<\/customname>:/gm, '$1:\n');
     }
-    //<card>在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>\n\n<plot>\n\n"
-    const cardtag = content.match(/(?=\n\n<\/card>)/) || '</card>';
-    const exampletag = content.match(/(?=\n\n<\/example>)/) || '</example>';
-    const plot = content.includes('</plot>') ? '<plot>' : '';
-    const firstChatStart = content.indexOf('\n\n[Start a new');
-    const lastChatStart = content.lastIndexOf('\n\n[Start a new');
-    firstChatStart != -1 && firstChatStart === lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
-    firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}\n\n${plot}` + content.slice(lastChatStart));
     //<card>消除空XML tags、两端空白符和多余的\n
     content = content.replace(/\s*<\|curtail\|>\s*/g, '\n')
         .replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '\n')
         .replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>')
-        .replace(/(?:<!--.*?-->)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '')
+        .replace(/\n(?:<!--.*?-->|Here.*?:)?\n<(card|example|hidden|plot|META)>\s+?<\/\1>/g, '')
         .replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '')
         .replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '')
         .replace(/(?<=\n)\n(?=\n)/g, '');
@@ -252,7 +245,7 @@ const updateParams = res => {
     try {
 /***************************** */
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
-        throw Error('Set your cookie inside config.js');
+        return console.log(`[33mNo cookie available, apiKey-Only mode enabled.[0m\n`); //throw Error('Set your cookie inside config.js');
     }
     updateCookies(Config.Cookie.replace(/^(sessionKey=)?/, 'sessionKey=')); //updateCookies(Config.Cookie);
     //console.log(`[2m${Main}[0m\n[33mhttp://${Config.Ip}:${Config.Port}/v1[0m\n\n${Object.keys(Config.Settings).map((setting => UnknownSettings.includes(setting) ? `??? [31m${setting}: ${Config.Settings[setting]}[0m` : `[1m${setting}:[0m ${ChangedSettings.includes(setting) ? '[33m' : '[36m'}${Config.Settings[setting]}[0m`)).sort().join('\n')}\n`);
@@ -442,6 +435,7 @@ const updateParams = res => {
                         apiKey = apiKey[0];
                         api_max_tokens = body.max_tokens;
                         api_model = body.model;
+                        if (!api_model.includes('claude')) throw Error('Please change to claude model in "External"');
                     } else if (Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
                         throw Error('ProxyPassword Wrong');
                     }
@@ -856,14 +850,14 @@ const updateParams = res => {
     for (let key in Config) {
         if (key === 'Settings') {
             for (let setting in Config.Settings) {
-                Config.Settings[setting] = convertToType(process.env[setting]) ?? Config.Settings[setting];
+                Config.Settings[setting] = process.env[setting] ? convertToType(process.env[setting]) : Config.Settings[setting];
             }
         } else {
-            Config[key] = key === 'CookieArray' ? (process.env[key]?.match(/(sessionKey=)?sk-ant-sid01-[\w-]{86}-[\w-]{6}AA/g) ?? Config[key]) : (convertToType(process.env[key]) ?? Config[key]);
+            Config[key] = process.env[key] ? convertToType(process.env[key]) : Config[key];
         }
     }
     Config.rProxy = Config.rProxy ? Config.rProxy.replace(/\/$/, '') : AI.end();
-    Config.CookieArray = [...new Set(Config.CookieArray)];
+    Config.CookieArray = [...new Set([Config.CookieArray].join('').match(/(sessionKey=)?sk-ant-sid01-[\w-]{86}-[\w-]{6}AA/g))];
     writeSettings(Config);
     currentIndex = Config.CookieIndex > 0 ? Config.CookieIndex - 1 : Config.Cookiecounter >= 0 ? Math.floor(Math.random() * Config.CookieArray.length) : 0;
 /***************************** */
