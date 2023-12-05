@@ -28,7 +28,8 @@ const convertToType = value => {
     if (/^\d+$/.test(value)) return parseInt(value);
     return value;
 }, CookieCleaner = () => {
-    Config.CookieArray = Config.CookieArray.filter(item => item !== Config.Cookie);
+    Config.CookieArray.splice(Config.CookieArray.indexOf(Config.Cookie), 1);
+    Config.Cookie = '';
     writeSettings(Config);
     currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
 }, padtxt = content => {
@@ -99,14 +100,6 @@ const convertToType = value => {
     } else {
         content = content.replace(/(<reply>\n|\n<\/reply>)\1*/g, '$1').replace(/<customname>(.*?)<\/customname>:/gm, '$1:\n');
     }
-    //<card>在第一个"[Start a new"前面加上"<example>"，在最后一个"[Start a new"前面加上"</example>\n\n<plot>\n\n"
-    const cardtag = content.match(/(?=\n\n<\/card>)/) || '</card>';
-    const exampletag = content.match(/(?=\n\n<\/example>)/) || '</example>';
-    const plot = content.includes('</plot>') ? '<plot>' : '';
-    const firstChatStart = content.indexOf('\n\n[Start a new');
-    const lastChatStart = content.lastIndexOf('\n\n[Start a new');
-    firstChatStart != -1 && firstChatStart === lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}` + content.slice(firstChatStart));
-    firstChatStart != lastChatStart && (content = content.slice(0, firstChatStart) + `\n\n${cardtag}\n<example>` + content.slice(firstChatStart, lastChatStart) + `\n\n${exampletag}\n\n${plot}` + content.slice(lastChatStart));
     //<card>消除空XML tags、两端空白符和多余的\n
     content = content.replace(/\s*<\|curtail\|>\s*/g, '\n')
         .replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '\n')
@@ -252,7 +245,7 @@ const updateParams = res => {
     try {
 /***************************** */
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
-        throw Error('Set your cookie inside config.js');
+        return console.log(`[33mNo cookie available, apiKey-Only mode enabled.[0m\n`); //throw Error('Set your cookie inside config.js');
     }
     updateCookies(Config.Cookie.replace(/^(sessionKey=)?/, 'sessionKey=')); //updateCookies(Config.Cookie);
     //console.log(`[2m${Main}[0m\n[33mhttp://${Config.Ip}:${Config.Port}/v1[0m\n\n${Object.keys(Config.Settings).map((setting => UnknownSettings.includes(setting) ? `??? [31m${setting}: ${Config.Settings[setting]}[0m` : `[1m${setting}:[0m ${ChangedSettings.includes(setting) ? '[33m' : '[36m'}${Config.Settings[setting]}[0m`)).sort().join('\n')}\n`);
@@ -863,7 +856,7 @@ const updateParams = res => {
         }
     }
     Config.rProxy = Config.rProxy ? Config.rProxy.replace(/\/$/, '') : AI.end();
-    Config.CookieArray = [...new Set(Config.CookieArray)];
+    Config.CookieArray = Array.from(new Set(Config.CookieArray.filter(str => /^(sessionKey=)?sk-ant-sid01-[\w-]{86}-[\w-]{6}AA$/.test(str))));
     writeSettings(Config);
     currentIndex = Config.CookieIndex > 0 ? Config.CookieIndex - 1 : Config.Cookiecounter >= 0 ? Math.floor(Math.random() * Config.CookieArray.length) : 0;
 /***************************** */
