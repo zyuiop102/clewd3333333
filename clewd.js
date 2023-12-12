@@ -36,6 +36,13 @@ const convertToType = value => {
     Config.Cookie = '';
     writeSettings(Config);
     currentIndex = (currentIndex - 1 + Config.CookieArray.length) % Config.CookieArray.length;
+}, ProModelConvert = model => {
+    if (/^claude-2\.0$/.test(model)) return AI.mdl()[7];
+    if (/1\.3/.test(model)) return AI.mdl()[5];
+    if (/^claude-v1\.\d$/.test(model)) return AI.mdl()[1];
+    if (/100k/.test(model)) return AI.mdl()[2];
+    if (/v1\.\d/.test(model)) return AI.mdl()[3];
+    return model;
 }, padtxt = content => {
     const {countTokens} = require('@anthropic-ai/tokenizer');
     const placeholder = Config.padtxt_placeholder || randomBytes(randomInt(5, 15)).toString('hex');
@@ -49,8 +56,8 @@ const convertToType = value => {
     const MergeHumanDisable = content.includes('<|Merge Human Disable|>');
     const MergeAssistantDisable = content.includes('<|Merge Assistant Disable|>');
     if (!MergeDisable) {
-        if (content.includes('<|Merge System Disable|>')) {
-            content = content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
+        if (content.includes('<|System Role|>')) {
+            content = content.replace(/(\n\n|^\s*)xmlPlot:(.*?(?:\n\n(Assistant|Human):|$))/gs, function(match, p1) {return '\n\nSystem:' + p1.replace(/(\n\n|^\s*)xmlPlot:/g, '\n\n')});
         }
         if (!MergeHumanDisable) {
             nonsys ? content = content.replace(/(\n\n|^\s*)xmlPlot:/g, '\n\nHuman:') : content = content.replace(/(\n\n|^\s*)(?<!\n\n(Human|Assistant):.*?)xmlPlot:\s*/gs, '$1').replace(/(\n\n|^\s*)xmlPlot:/g, '\n\nHuman:');
@@ -241,7 +248,7 @@ const updateParams = res => {
     }
     try {
 /***************************** */
-    if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1 || (Config.CookieArray?.length > 0 && invalidtime >= totaltime)) { //if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
+    if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1 || (Config.CookieArray?.length > 0 && invalidtime > totaltime)) { //if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
         return console.log(`[33mNo cookie available, apiKey-Only mode enabled.[0m\n`); //throw Error('Set your cookie inside config.js');
     }
     updateCookies(Config.Cookie.replace(/^(sessionKey=)?/, 'sessionKey=')); //updateCookies(Config.Cookie);
@@ -291,11 +298,6 @@ const updateParams = res => {
     uuidOrg = accInfo?.uuid;
 /************************* */
     model = accountInfo.account.statsig.values.dynamic_configs["6zA9wvTedwkzjLxWy9PVe7yydI00XDQ6L5Fejjq/2o8="]?.value?.model;
-    model != AI.mdl() && console.log(`[33m${model}[0m`);
-    if (model != AI.mdl() && Config.Cookiecounter === -2) {
-        CookieCleaner();
-        return CookieChanger.emit('ChangeCookie');
-    }
     const Overlap = uuidOrgArray.includes(uuidOrg) && percentage <= 100 && Config.CookieArray?.length > 0;
     !Overlap && uuidOrgArray.push(uuidOrg);
     const Unverified = !accountInfo.account.completed_verification_at;
@@ -392,20 +394,19 @@ const updateParams = res => {
     switch (req.url) {
       case '/v1/models':
         res.json({
-            data: [ {
 /***************************** */
-                id: 'claude-2.1'                },{
-                id: 'claude-2.0'                },{
-                id: 'claude-v1.3'               },{
-                id: 'claude-v1.3-100k'          },{
-                id: 'claude-v1.2'               },{
-                id: 'claude-v1.0'               },{
-                id: 'claude-instant-1.2'        },{
-                id: 'claude-instant-v1.1'       },{
-                id: 'claude-instant-v1.1-100k'  },{
-                id: 'claude-instant-v1.0'       //id: AI.mdl()
+            data: [ //data: AI.mdl().map((name => ({
+                ...AI.mdl().slice(1).map((name => ({ id: name }))), {
+                    id: 'claude-2.0'                },{
+                    id: 'claude-v1.3'               },{
+                    id: 'claude-v1.3-100k'          },{
+                    id: 'claude-v1.2'               },{
+                    id: 'claude-v1.0'               },{
+                    id: 'claude-instant-v1.1'       },{
+                    id: 'claude-instant-v1.1-100k'  },{
+                    id: 'claude-instant-v1.0'       //id: name
+            }] //})))
 /***************************** */
-            } ]
         });
         break;
 
@@ -429,11 +430,10 @@ const updateParams = res => {
 /************************* */
                     apiKey = req.headers.authorization?.match(/sk-ant-api\d\d-[\w-]{86}-[\w-]{6}AA/g);
                     let max_tokens_to_sample, stop_sequences;
-                    if (apiKey) {
+                    if (apiKey || Config.Settings.PassParams) {
                         stop_sequences = body.stop;
                         max_tokens_to_sample = body.max_tokens;
                         model = body.model;
-                        if (!model.includes('claude')) throw Error('Please change to claude model in "External"');
                     } else if (req.headers.authorization.includes('sk-ant-api')) {
                         throw Error('apiKey Wrong');
                     } else if (Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
@@ -473,7 +473,13 @@ const updateParams = res => {
                         console.log('[33mhaving[0m [1mAllSamples[0m and [1mNoSamples[0m both set to true is not supported');
                         throw Error('Only one can be used at the same time: AllSamples/NoSamples');
                     }
-                    //const model = AI.mdl();
+                    //const model = body.model;
+                    if (!apiKey && Config.Settings.PassParams) { //if (model === AI.mdl()[0]) {
+                        model = ProModelConvert(model); //return;
+                    }
+                    if (!/claude-.*/.test(model)) {
+                        throw Error('Invalid model selected: ' + model);
+                    }
                     curPrompt = {
                         firstUser: messages.find((message => 'user' === message.role)),
                         firstSystem: messages.find((message => 'system' === message.role)),
@@ -506,7 +512,7 @@ const updateParams = res => {
                                 completion: {
                                     prompt: '',
                                     timezone: AI.zone(),
-                                    model: model || AI.mdl()
+                                    model
                                 },
                                 organization_uuid: uuidOrg,
                                 conversation_uuid: Conversation.uuid,
@@ -669,7 +675,7 @@ const updateParams = res => {
                         : prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '： '));
                     Config.Settings.padtxt && (prompt = padtxt(prompt));
 /******************************** */
-                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${model} (${type}) ${tokens}t PROMPT:\n${prompt}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
+                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${model} (${type}) ${tokens}t PROMPT:\n${prompt}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### MODEL: ${model}\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
 /******************************** */
                         if (apiKey) {
@@ -715,11 +721,11 @@ const updateParams = res => {
                                 },
                                 prompt: prompt || '',
                                 timezone: AI.zone(),
-                                model: model || AI.mdl()
+                                model
                             },
                             organization_uuid: uuidOrg,
                             conversation_uuid: Conversation.uuid,
-                            text: prompt,
+                            text: prompt || '',
                             attachments
                         };
                         let headers = {
@@ -750,7 +756,7 @@ const updateParams = res => {
                         version: Main,
                         minSize: Config.BufferSize,
                         model,
-                        streaming: body.stream,
+                        streaming: null != body.stream,
                         abortControl,
                         source: fetchAPI
                     }, Logger);
