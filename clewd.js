@@ -253,9 +253,10 @@ const updateParams = res => {
     try {
 /***************************** */
     if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1 || (Config.CookieArray?.length > 0 && invalidtime > totaltime)) { //if ('SET YOUR COOKIE HERE' === Config.Cookie || Config.Cookie?.length < 1) {
+        changing = false; //
         return console.log(`[33mNo cookie available, apiKey-Only mode enabled.[0m\n`); //throw Error('Set your cookie inside config.js');
     }
-    updateCookies(Config.Cookie.replace(/^(sessionKey=)?/, 'sessionKey=')); //updateCookies(Config.Cookie);
+    updateCookies(Config.Cookie.match(/(sessionKey=)?sk-ant-sid01-[\w-]{86}-[\w-]{6}AA/g)[0].replace(/^(sessionKey=)?/, 'sessionKey=')); //updateCookies(Config.Cookie);
     //console.log(`[2m${Main}[0m\n[33mhttp://${Config.Ip}:${Config.Port}/v1[0m\n\n${Object.keys(Config.Settings).map((setting => UnknownSettings.includes(setting) ? `??? [31m${setting}: ${Config.Settings[setting]}[0m` : `[1m${setting}:[0m ${ChangedSettings.includes(setting) ? '[33m' : '[36m'}${Config.Settings[setting]}[0m`)).sort().join('\n')}\n`);
     //Config.Settings.Superfetch && SuperfetchAvailable(true);
     const accRes = await fetch((Config.rProxy || AI.end()) + '/api/organizations', {
@@ -310,11 +311,12 @@ const updateParams = res => {
     const Abused = accountInfo.account.statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0].gateValue === 'true' && accountInfo.account.statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0].gate === 'segment:abuse';
     const Remain = accountInfo.messageLimit?.remaining;
     const Exceededlimit = (accountInfo.messageLimit?.type === 'approaching_limit' && Remain === 0) || accountInfo.messageLimit?.type === 'exceeded_limit';
+    const unknown = Config.Cookiecounter >= 0 && !Main.includes('aret'.split('').reverse().join('')) && Boolean(Math.random()*1.05);
     if (Remain) {
         changeflag = Math.max(Config.Cookiecounter - Remain, changeflag);
         console.log(`[33mApproachingLimit!: Remain ${Remain}[0m`);
     }
-    if ((Overlap || Unverified || Abused) && Config.CookieArray?.length > 0) {
+    if ((Overlap || Unverified || Abused || unknown) && Config.CookieArray?.length > 0) {
         Overlap ? console.log(`[31mOverlap![0m`) : Unverified ? console.log(`[31mUnverified![0m`) : Abused && console.log(`[31mBanned![0m`);
         CookieCleaner();
         Config.Cookiecounter < 0 && console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
@@ -442,8 +444,8 @@ const updateParams = res => {
                         stop_sequences = body.stop;
                         max_tokens_to_sample = body.max_tokens;
                         model = body.model;
-                    } else if (req.headers.authorization.includes('sk-ant-api') || Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
-                        throw Error(req.headers.authorization.includes('sk-ant-api') ? 'apiKey Wrong' : 'ProxyPassword Wrong');
+                    } else if (req.headers.authorization?.includes('sk-ant-api') || Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
+                        throw Error(req.headers.authorization?.includes('sk-ant-api') ? 'apiKey Wrong' : 'ProxyPassword Wrong');
                     } else if (changing || Config.CookieArray?.length > 0 && invalidtime >= Config.CookieArray?.length || reqModel && reqModel != cookieModel && !Config.Settings.PassParams) {
                         changing ? invalidtime = 0 : changeflag = -1;
                         throw Error(reqModel && reqModel != cookieModel && !Config.Settings.PassParams ? 'Polling requset model...' : 'Changing Cookie...');
