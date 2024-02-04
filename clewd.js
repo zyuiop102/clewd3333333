@@ -717,35 +717,31 @@ const updateParams = res => {
                             let splitedprompt = prompt.split('\n\nPlainPrompt:'); //
                             prompt = splitedprompt[0]; //
                             attachments.push({
-                                extracted_content: (prompt),
+                                extracted_content: prompt,
                                 file_name: 'paste.txt',  //fileName(),
-                                file_size: Buffer.from(prompt).byteLength,
-                                file_type: 'txt'  //'text/plain'
+                                file_type: 'text/plain',
+                                file_size: Buffer.from(prompt).byteLength
                             });
                             prompt = 'r' === type ? Config.PromptExperimentFirst : Config.PromptExperimentNext;
                             splitedprompt.length > 1 && (prompt += splitedprompt[1]); //
                         }
                         let res;
                         const body = {
-                            completion: {
-                                ...Config.Settings.PassParams && {
-                                    temperature
-                                },
-                                prompt: prompt || '',
-                                timezone: AI.zone(),
-                                model
+                            attachments,
+                            files: [],
+                            model,
+                            ...Config.Settings.PassParams && {
+                                temperature
                             },
-                            conversation_uuid: Conversation.uuid,
-                            organization_uuid: uuidOrg,
-                            text: prompt || '',
-                            attachments
+                            prompt: prompt || '',
+                            timezone: AI.zone()
                         };
                         let headers = {
                             ...AI.hdr(Conversation.uuid || ''),
                             Accept: 'text/event-stream',
                             Cookie: getCookies()
                         };
-                        res = await (Config.Settings.Superfetch ? Superfetch : fetch)((Config.rProxy || AI.end()) + '/api/append_message', {
+                        res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg || ''}/chat_conversations/${Conversation.uuid || ''}/completion`, {
                             stream: true,
                             signal,
                             method: 'POST',
