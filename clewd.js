@@ -50,7 +50,8 @@ const asyncPool = async (poolLimit, array, iteratorFn) => {
     const {countTokens} = require('@anthropic-ai/tokenizer');
     const placeholder = Config.padtxt_placeholder || randomBytes(randomInt(5, 15)).toString('hex');
     tokens = countTokens(content);
-    const padding = placeholder.repeat(Math.floor((/(?<=<\|padtxt.*?)\d+(?=.*?\|>)/.test(content) ? parseInt(/(?<=<\|padtxt.*?)\d+(?=.*?\|>)/.exec(content)[0]) : Math.min(Config.Settings.padtxt, Math.max(1000, Config.Settings.padtxt - tokens))) / countTokens(placeholder.trim())));
+    const minlength = 'string' == typeof Config.Settings.padtxt ? parseInt(Config.Settings.padtxt.split(',')[0]) : 1000, padlength = 'string' == typeof Config.Settings.padtxt ? parseInt(Config.Settings.padtxt.split(',')[1]) : Config.Settings.padtxt;
+    const padding = placeholder.repeat(Math.floor((/(?<=<\|padtxt.*?)\d+(?=.*?\|>)/.test(content) ? parseInt(/(?<=<\|padtxt.*?)\d+(?=.*?\|>)/.exec(content)[0]) : Math.min(padlength, Math.max(minlength, padlength - tokens))) / countTokens(placeholder.trim())));
     content = /<\|padtxt.*?\|>/.test(content) ? content.replace(/<\|padtxt.*?\|>/, padding).replace(/\s*<\|padtxt.*?\|>\s*/g, '\n\n') : !apiKey ? padding + '\n\n\n' + content.trim() : content;
     return content;
 }, xmlPlot_merge = (content, nonsys) => {
@@ -118,7 +119,8 @@ const asyncPool = async (poolLimit, array, iteratorFn) => {
         .replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>')
         .replace(/(?:<!--.*?-->\n|.+?: ?\n)?<(card|example|hidden|plot|META)>\s+?<\/\1>\n*/g, '')
         .replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '')
-        .replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '');
+        .replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '')
+        .replace(/\s*\n\n(H(uman)?|A(ssistant)?): +/g, '\n\n$1: ');
     //确保格式正确
     if (apiKey) {
         content = content.replace(/\n\n(Assistant|Human):(?!.*?\n\n(Assistant|Human):).*$/s, function(match, p1) {return p1 === 'Assistant' ? match : match + '\n\nAssistant: '}).replace(/\s*<\|noAssistant\|>\s*(.*?)(?:\n\nAssistant:\s*)?$/s, '\n\n$1');
@@ -180,7 +182,7 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
         PreserveChats: false,
         LogMessages: true,
         FullColon: true,
-        padtxt: 15000,
+        padtxt: "1000,15000",
         xmlPlot: true,
         Superfetch: true
     }
@@ -354,27 +356,11 @@ const updateParams = res => {
             return 'consumer_banned' === flagtype ? CookieCleaner(percentage) : CookieChanger.emit('ChangeCookie');
         }
     }
-    const accountRes = await fetch((Config.rProxy || AI.end()) + '/api/auth/current_account', {
-        method: 'GET',
-        headers: {
-            ...AI.hdr(),
-            Cookie: getCookies()
-        }
-    });
-    await checkResErr(accountRes);
-    const accountInfo = await accountRes.json();
-    if (!accountInfo.account.completed_verification_at) {
-        console.log(`[31mUnverified![0m`);
-        return CookieCleaner(percentage);
-    }
-    if (accountInfo.messageLimit?.remaining) {
-        changeflag = Math.max(Config.Cookiecounter - accountInfo.messageLimit?.remaining, changeflag);
-        console.log(`[33mApproachingLimit!: Remain ${accountInfo.messageLimit?.remaining}[0m`);
-    }
-    if (Config.Cookiecounter < 0 || (accountInfo.messageLimit?.type === 'approaching_limit' && accountInfo.messageLimit?.remaining === 0) || accountInfo.messageLimit?.type === 'exceeded_limit') {
-        console.log(Config.Cookiecounter < 0 ? `[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n` : '[35mExceeded limit![0m\n');
+    changing = false, invalidtime = 0;
+    if (Config.Cookiecounter < 0) {
+        console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
         return CookieChanger.emit('ChangeCookie');
-    } else changing = false, invalidtime = 0;
+    }
 /***************************** */
     const convRes = await fetch(`${Config.rProxy || AI.end()}/api/organizations/${accInfo.uuid}/chat_conversations`, { //const convRes = await fetch(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg}/chat_conversations`, {
         method: 'GET',
@@ -414,16 +400,17 @@ const updateParams = res => {
 /***************************** */
             data: [ //data: AI.mdl().map((name => ({
                 ...AI.mdl().slice(1).map((name => ({ id: name }))), {
-                    id: 'claude-2.1-basil'          },{
-                    id: 'claude-2.1-cocoa'          },{
-                    id: 'claude-2'                  },{
-                    id: 'claude-v1.3'               },{
-                    id: 'claude-v1.3-100k'          },{
-                    id: 'claude-v1.2'               },{
-                    id: 'claude-v1.0'               },{
-                    id: 'claude-instant-v1.1'       },{
-                    id: 'claude-instant-v1.1-100k'  },{
-                    id: 'claude-instant-v1.0'       //id: name
+                    id: 'claude-2.1-acorn'      },{
+                    id: 'claude-2.1-basil'      },{
+                    id: 'claude-2.1-cocoa'      },{
+                    id: 'claude-2.1-coral'      },{
+                    id: 'claude-2.1-daisy'      },{
+                    id: 'claude-2.1-echo'       },{    
+                    id: 'claude-2.1-pasta'      },{
+                    id: 'claude-2.1-surf'       },{
+                    id: 'claude-2'              },{
+                    id: 'claude-1.3'            },{
+                    id: 'claude-instant-1.1'    //id: name
             }] //})))
 /***************************** */
         });
@@ -452,10 +439,10 @@ const updateParams = res => {
                     apiKey = req.headers.authorization?.match(/sk-ant-api\d\d-[\w-]{86}-[\w-]{6}AA/g) || req.headers.authorization?.match(/(?<=3rdKey:).*/)?.map(item => item.trim())[0].split(/ ?, ?/);
                     model = apiKey || Config.Settings.PassParams && body.model.includes('claude-') || isPro && AI.mdl().includes(body.model) ? body.model : cookieModel;
                     submodel = /^claude-2\.\d/.test(body.model) ? body.model : '';
-                    const max_tokens_to_sample = body.max_tokens, stop_sequences = body.stop;
+                    let max_tokens_to_sample = body.max_tokens, stop_sequences = body.stop || [];
                     if (!apiKey && Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
                         throw Error('ProxyPassword Wrong');
-                    } else if (!Config.Settings.PassParams && !changing && !apiKey && !isPro && submodel && submodel != cookieModel || invalidtime >= Config.CookieArray?.length) {
+                    } else if (!changing && !Config.Settings.PassParams && !apiKey && (!isPro && submodel && submodel != cookieModel || invalidtime >= Config.CookieArray?.length)) {
                         changing = true;
                         CookieChanger.emit('ChangeCookie');
                     }
@@ -685,16 +672,19 @@ const updateParams = res => {
                     'R' !== type || prompt || (prompt = '...regen...');
 /******************************** */
                     prompt = Config.Settings.xmlPlot ? xmlPlot(prompt, !/claude-2\.[1-9]/.test(model)) : apiKey ? `\n\nHuman: ${genericFixes(prompt)}\n\nAssistant: ` : genericFixes(prompt).trim();
-                    Config.Settings.FullColon && (prompt = apiKey
-                        ? prompt.replace(/(?<!\n\nHuman:.*)(\n\nAssistant):/gs, '$1︓').replace(/(\n\nHuman):(?!.*\n\nAssistant:)/gs, '$1︓')
-                        : prompt.replace(/(?<=\n\n(H(?:uman)?|A(?:ssistant)?)):[ ]?/g, '︓ '));
+                    if (Config.Settings.FullColon) {
+                        stop_sequences.push('\n\rHuman:', '\n\rAssistant:');
+                        prompt = apiKey
+                            ? prompt.replace(/(?<!\n\nHuman:.*)\n\n(Assistant:)/gs, '\n\r$1').replace(/\n\n(Human:)(?!.*\n\nAssistant:)/gs, '\n\r$1')
+                            : /claude-2.(1-|[2-9])/.test(model) ? prompt.replace(/\n\n(Human|Assistant):/g, '\n\r$1:') : prompt.replace(/\n\n(Human|Assistant):/g, '\n\n$1：');
+                    }
                     prompt = padtxt(prompt);
 /******************************** */
-                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${model} (${type}) regex:\n${regexLog}\n####### PROMPT ${tokens}t:\n${prompt}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### MODEL: ${model}\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
+                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${model} (${type}) regex:\n${regexLog}\n####### PROMPT ${tokens}t:\n${prompt.replace(/\n\r/g, '\n\n')}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### MODEL: ${model}\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
 /******************************** */
                         if (apiKey) {
-                            const res = await fetch(`${Config.api_rProxy ? Config.api_rProxy.replace('/v1','') : 'https://api.anthropic.com'}/v1/complete`, {
+                            const res = await fetch(`${(Config.api_rProxy || 'https://api.anthropic.com').replace(/\/v1 *$/,'')}/v1/complete`, {
                                 method: 'POST',
                                 signal,
                                 headers: {
@@ -735,6 +725,7 @@ const updateParams = res => {
                             files: [],
                             model,
                             ...Config.Settings.PassParams && {
+                                stop_sequences, //
                                 temperature
                             },
                             prompt: prompt || '',
@@ -824,7 +815,7 @@ const updateParams = res => {
       default:
         !['/', '/v1', '/favicon.ico'].includes(req.url) && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
         res.writeHead(200, {'Content-Type': 'text/html'});
-        res.write(`<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>点击复制反向代理: <a href="v1" onclick="copyLink(event)">Copy Link</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude模型（酒馆需打开Show "External" models，仅在api模式有模型选择差异）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">Rentry</a> | <a href="https://discord.com/invite/B7Wr25Z7BZ" target="FAQ">Discord</a><br/><br/><br/>❗警惕任何高风险cookie购买服务，以及破坏中文AI开源共享环境倒卖免费资源抹去署名的群组（🈲黑名单：AI新服务、浅睡(鲑鱼)、赛博女友制作人🈲）\n</body>\n</html>`);
+        res.write(`<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>点击复制反向代理: <a href="v1" onclick="copyLink(event)">Copy Link</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude模型（酒馆需打开Show "External" models，仅在api模式有模型选择差异）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">Rentry</a> | <a href="https://discord.com/invite/B7Wr25Z7BZ" target="FAQ">Discord</a><br/><br/><br/>❗警惕任何高风险cookie/伪api(25k cookie)购买服务，以及破坏中文AI开源共享环境倒卖免费资源抹去署名的群组（🈲黑名单：AI新服务、浅睡(鲑鱼)、赛博女友(青麈)🈲）\n</body>\n</html>`);
         res.end();
         //res.json(//    {//    error: {//        message: '404 Not Found',//        type: 404,//        param: null,//        code: 404//    }//}, 404);
     }
