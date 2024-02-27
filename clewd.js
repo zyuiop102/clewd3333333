@@ -39,6 +39,10 @@ const asyncPool = async (poolLimit, array, iteratorFn) => {
     if (value === 'false') return false;
     if (/^\d+$/.test(value)) return parseInt(value);
     return value;
+}, convertWidth = (str, reverse = false) => {
+    return str.replace(reverse ? /[Ａ-Ｚａ-ｚ]/g : /[A-Za-z]/g, function(match) {
+        return String.fromCharCode(match.charCodeAt(0) + (reverse ? -65248 : 65248));
+    });
 }, CookieCleaner = percentage => {
     Config.CookieArray.splice(Config.CookieArray.indexOf(Config.Cookie), 1);
     Config.Cookie = '';
@@ -48,10 +52,13 @@ const asyncPool = async (poolLimit, array, iteratorFn) => {
     return CookieChanger.emit('ChangeCookie');
 }, padtxt = content => {
     const {countTokens} = require('@anthropic-ai/tokenizer');
-    const placeholder = Config.padtxt_placeholder || randomBytes(randomInt(5, 15)).toString('hex');
     tokens = countTokens(content);
-    const minlength = 'string' == typeof Config.Settings.padtxt ? parseInt(Config.Settings.padtxt.split(',')[0]) : 1000, padlength = 'string' == typeof Config.Settings.padtxt ? parseInt(Config.Settings.padtxt.split(',')[1]) : Config.Settings.padtxt;
-    const padding = placeholder.repeat(Math.floor((/(?<=<\|padtxt.*?)\d+(?=.*?\|>)/.test(content) ? parseInt(/(?<=<\|padtxt.*?)\d+(?=.*?\|>)/.exec(content)[0]) : Math.min(padlength, Math.max(minlength, padlength - tokens))) / countTokens(placeholder.trim())));
+    const padtxt = String(Config.Settings.padtxt).split(',').reverse(), maxtokens = parseInt(padtxt[0]), extralimit = parseInt(padtxt[1]) || 1000, minlimit = parseInt(padtxt[2]);
+    const placeholder = (tokens > maxtokens - extralimit && minlimit ? Config.placeholder_byte : Config.placeholder_token) || randomBytes(randomInt(5, 15)).toString('hex');
+    const placeholdertokens = countTokens(placeholder.trim());
+    for (let match; match = content.match(/<\|padtxt.*?(\d+)t.*?\|>/); content = content.replace(match[0], placeholder.repeat(parseInt(match[1]) / placeholdertokens))) tokens += parseInt(match[1]);
+    if(/<\|padtxt off.*?\|>/.test(content)) return content.replace(/\s*<\|padtxt.*?\|>\s*/g, '\n\n');
+    const padding = placeholder.repeat(Math.min(maxtokens, (tokens <= maxtokens - extralimit ? maxtokens - tokens : minlimit ? minlimit : extralimit)) / placeholdertokens);
     content = /<\|padtxt.*?\|>/.test(content) ? content.replace(/<\|padtxt.*?\|>/, padding).replace(/\s*<\|padtxt.*?\|>\s*/g, '\n\n') : !apiKey ? padding + '\n\n\n' + content.trim() : content;
     return content;
 }, xmlPlot_merge = (content, nonsys) => {
@@ -162,7 +169,8 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
     SystemInterval: 3,
     rProxy: '',
     api_rProxy: '',
-    padtxt_placeholder: '',
+    placeholder_token: '',
+    placeholder_byte: '',
     PromptExperimentFirst: '',
     PromptExperimentNext: '',
     PersonalityFormat: '{{char}}\'s personality: {{personality}}',
@@ -182,7 +190,7 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
         PreserveChats: false,
         LogMessages: true,
         FullColon: true,
-        padtxt: "1000,15000",
+        padtxt: "1000,1000,15000",
         xmlPlot: true,
         Superfetch: true
     }
@@ -439,7 +447,7 @@ const updateParams = res => {
                     apiKey = req.headers.authorization?.match(/sk-ant-api\d\d-[\w-]{86}-[\w-]{6}AA/g) || req.headers.authorization?.match(/(?<=3rdKey:).*/)?.map(item => item.trim())[0].split(/ ?, ?/);
                     model = apiKey || Config.Settings.PassParams && body.model.includes('claude-') || isPro && AI.mdl().includes(body.model) ? body.model : cookieModel;
                     submodel = /^claude-2\.\d/.test(body.model) ? body.model : '';
-                    let max_tokens_to_sample = body.max_tokens, stop_sequences = body.stop || [];
+                    let max_tokens_to_sample = body.max_tokens, stop_sequences = body.stop || [], top_p = body.top_p, top_k = body.top_k;
                     if (!apiKey && Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
                         throw Error('ProxyPassword Wrong');
                     } else if (!changing && !Config.Settings.PassParams && !apiKey && (!isPro && submodel && submodel != cookieModel || invalidtime >= Config.CookieArray?.length)) {
@@ -672,15 +680,12 @@ const updateParams = res => {
                     'R' !== type || prompt || (prompt = '...regen...');
 /******************************** */
                     prompt = Config.Settings.xmlPlot ? xmlPlot(prompt, !/claude-2\.[1-9]/.test(model)) : apiKey ? `\n\nHuman: ${genericFixes(prompt)}\n\nAssistant: ` : genericFixes(prompt).trim();
-                    if (Config.Settings.FullColon) {
-                        stop_sequences.push('\n\rHuman:', '\n\rAssistant:');
-                        prompt = apiKey
-                            ? prompt.replace(/(?<!\n\nHuman:.*)\n\n(Assistant:)/gs, '\n\r$1').replace(/\n\n(Human:)(?!.*\n\nAssistant:)/gs, '\n\r$1')
-                            : /claude-2.(1-|[2-9])/.test(model) ? prompt.replace(/\n\n(Human|Assistant):/g, '\n\r$1:') : prompt.replace(/\n\n(Human|Assistant):/g, '\n\n$1：');
-                    }
+                    Config.Settings.FullColon && stop_sequences.push(convertWidth('\n\nHuman:'), convertWidth('\n\nAssistant:')) && (prompt = apiKey
+                            ? prompt.replace(/(?<!\n\nHuman:.*)\n\nAssistant:|\n\nHuman:(?!.*\n\nAssistant:)/gs, function(match) {return convertWidth(match)})
+                            : prompt.replace(/\n\n(Human|Assistant):/g, function(match) {return convertWidth(match)}));
                     prompt = padtxt(prompt);
 /******************************** */
-                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${model} (${type}) regex:\n${regexLog}\n####### PROMPT ${tokens}t:\n${prompt.replace(/\n\r/g, '\n\n')}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### MODEL: ${model}\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
+                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${model} (${type}) regex:\n${regexLog}\n####### PROMPT ${tokens}t:\n${convertWidth(prompt, true)}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### MODEL: ${model}\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
 /******************************** */
                         if (apiKey) {
@@ -694,12 +699,14 @@ const updateParams = res => {
                                     'anthropic-version': '2023-06-01'
                                 },
                                 body: JSON.stringify({
-                                    ...stop_sequences && {stop_sequences},
+                                    stop_sequences,
                                     model,
                                     max_tokens_to_sample,
                                     stream: true,
                                     prompt,
-                                    temperature
+                                    temperature,
+                                    top_k,
+                                    top_p
                                 }),
                             });
                             await checkResErr(res);
@@ -725,7 +732,10 @@ const updateParams = res => {
                             files: [],
                             model,
                             ...Config.Settings.PassParams && {
+                                max_tokens_to_sample, //
                                 stop_sequences, //
+                                top_k, //
+                                top_p, //
                                 temperature
                             },
                             prompt: prompt || '',
