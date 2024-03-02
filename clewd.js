@@ -181,7 +181,7 @@ let uuidOrg, curPrompt = {}, prevPrompt = {}, prevMessages = [], prevImpersonate
         NoSamples: false,
         StripAssistant: false,
         StripHuman: false,
-        PassParams: false,
+        PassParams: true,
         ClearFlags: true,
         PreserveChats: false,
         LogMessages: true,
@@ -404,19 +404,21 @@ const updateParams = res => {
 /***************************** */
             data: [ //data: AI.mdl().map((name => ({
                 ...AI.mdl().slice(1).map((name => ({ id: name }))), {
-                    id: 'claude-2.1-acorn'      },{
-                    id: 'claude-2.1-basil'      },{
-                    id: 'claude-2.1-cocoa'      },{
-                    id: 'claude-2.1-coral'      },{
-                    id: 'claude-2.1-daisy'      },{
-                    id: 'claude-2.1-echo'       },{
-                    id: 'claude-2.1-fable'      },{
-                    id: 'claude-2.1-gem'        },{
-                    id: 'claude-2.1-pasta'      },{
-                    id: 'claude-2.1-surf'       },{
-                    id: 'claude-2'              },{
-                    id: 'claude-1.3'            },{
-                    id: 'claude-instant-1.1'    //id: name
+                    id: 'claude-1.3'                },{
+                    id: 'claude-2'                  },{
+                    id: 'claude-2.1-acorn'          },{
+                    id: 'claude-2.1-basil'          },{
+                    id: 'claude-2.1-cocoa'          },{
+                    id: 'claude-2.1-coral'          },{
+                    id: 'claude-2.1-daisy'          },{
+                    id: 'claude-2.1-echo'           },{
+                    id: 'claude-2.1-fable'          },{
+                    id: 'claude-2.1-gem'            },{
+                    id: 'claude-2.1-pasta'          },{
+                    id: 'claude-2.1-surf'           },{
+                    id: 'claude-3-opus-20240229'    },{
+                    id: 'claude-3-sonnet-20240229'  },{
+                    id: 'claude-instant-1.1'        //id: name
             }] //})))
 /***************************** */
         });
@@ -444,11 +446,11 @@ const updateParams = res => {
 /************************* */
                     apiKey = req.headers.authorization?.match(/sk-ant-api\d\d-[\w-]{86}-[\w-]{6}AA/g) || req.headers.authorization?.match(/(?<=3rdKey:).*/)?.map(item => item.trim())[0].split(/ ?, ?/);
                     model = apiKey || Config.Settings.PassParams && body.model.includes('claude-') || isPro && AI.mdl().includes(body.model) ? body.model : cookieModel;
-                    submodel = /^claude-2\.\d/.test(body.model) ? body.model : '';
+                    submodel = /claude-\d.+/.test(body.model) ? body.model : '';
                     let max_tokens_to_sample = body.max_tokens, stop_sequences = body.stop || [], top_p = body.top_p, top_k = body.top_k;
                     if (!apiKey && Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
                         throw Error('ProxyPassword Wrong');
-                    } else if (!changing && !Config.Settings.PassParams && !apiKey && (!isPro && submodel && submodel != cookieModel || invalidtime >= Config.CookieArray?.length)) {
+                    } else if (!changing && !apiKey && (!Config.Settings.PassParams && !isPro && submodel && submodel != cookieModel || invalidtime >= Config.CookieArray?.length)) {
                         changing = true;
                         CookieChanger.emit('ChangeCookie');
                     }
@@ -677,23 +679,29 @@ const updateParams = res => {
 /******************************** */
                     const messagesAPI = /<\|messagesAPI\|>/.test(prompt);
                     apiKey && messagesAPI && (type = 'msg_api');
-                    prompt = Config.Settings.xmlPlot ? xmlPlot(prompt, !/claude-2\.[1-9]/.test(model)) : apiKey ? `\n\nHuman: ${genericFixes(prompt)}\n\nAssistant:` : genericFixes(prompt).trim();
-                    if (Config.Settings.FullColon) if (/claude-2.(1-|[2-9])/.test(model)) {
-                            stop_sequences.push('\n\r\nHuman:', '\n\r\nAssistant:');
-                            prompt = apiKey ? prompt.replace(/(?<!\n\nHuman:.*)\n\n(Assistant:)/gs, '\n\r\n$1').replace(/\n\n(Human:)(?!.*\n\nAssistant:)/gs, '\n\r\n$1') : prompt.replace(/\n\n(Human|Assistant):/g, '\n\r\n$1:');
-                        } else prompt = apiKey ? prompt.replace(/(?<!\n\nHuman:.*)(\n\nAssistant):/gs, '$1：').replace(/(\n\nHuman):(?!.*\n\nAssistant:)/gs, '$1：') : prompt.replace(/\n\n(Human|Assistant):/g, '\n\n$1：');
+                    prompt = Config.Settings.xmlPlot ? xmlPlot(prompt, !/claude-(2\.[1-9]|[3-9])/.test(model)) : apiKey ? `\n\nHuman: ${genericFixes(prompt)}\n\nAssistant:` : genericFixes(prompt).trim();
+                    if (Config.Settings.FullColon) if (/claude-(2\.(1-|[2-9])|[3-9])/.test(model)) {
+                        stop_sequences.push('\n\r\nHuman:', '\n\r\nAssistant:');
+                        prompt = apiKey ? prompt.replace(/(?<!\n\nHuman:.*)\n\n(Assistant:)/gs, '\n\r\n$1').replace(/\n\n(Human:)(?!.*\n\nAssistant:)/gs, '\n\r\n$1') : prompt.replace(/\n\n(Human|Assistant):/g, '\n\r\n$1:');
+                    } else prompt = apiKey ? prompt.replace(/(?<!\n\nHuman:.*)(\n\nAssistant):/gs, '$1：').replace(/(\n\nHuman):(?!.*\n\nAssistant:)/gs, '$1：') : prompt.replace(/\n\n(Human|Assistant):/g, '\n\n$1：');
                     prompt = padtxt(prompt);
 /******************************** */
-                    console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`); //console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
+                    console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
                     Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${model} (${type}) regex:\n${regexLog}\n####### PROMPT ${tokens}t:\n${prompt}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### MODEL: ${model}\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
 /******************************** */
                         if (apiKey) {
-                            let system, messages;
+                            let messages, system;
                             if (messagesAPI) {
-                                const splitHuman = prompt.split('\n\nHuman:'), splitAssistant = splitHuman.slice().reverse()[0].split('\n\nAssistant:'), userMessage = [...splitHuman.slice(1, -1), splitAssistant.slice(0, -1).join('\n\nAssistant:')].join('\n\nHuman:'), assistantMessage = splitAssistant.slice().reverse()[0];
-                                messages = [{role: 'user', content: Config.Settings.FullColon ? userMessage.replace(/\n\n(Human|Assistant):/g, '\n\r\n$1:').trim() : userMessage.trim()}, assistantMessage && {role: 'assistant', content: assistantMessage.trim()}].filter(Boolean), system = splitHuman[0].trim();
+                                const rounds = prompt.replace(/\n\nAssistant: *$/, '').split('\n\nHuman:');
+                                messages = (Config.Settings.FullColon ? rounds.slice(1).reduce((acc, current) => {
+                                    acc.push(current);
+                                    return acc.length > 1 && !acc[acc.length - 2].includes('\n\nAssistant:') ? acc.slice(0, -2).concat(acc.slice(-2).join('\n\r\nHuman:')) : acc;
+                                }, []) : rounds.slice(1)).flatMap(round => {
+                                    const turns = Config.Settings.FullColon ? round.replace(/(?<=\n\nAssistant:.*?)\n(\nAssistant:)/g, '\n\r$1').split('\n\nAssistant:') : round.split('\n\nAssistant:');
+                                    return [{role: 'user', content: turns[0].trim()}].concat(turns.slice(1).flatMap(turn => [{role: 'assistant', content: turn.trim()}]))
+                                }), system = rounds[0].trim();
                             }
                             const res = await fetch(`${(Config.api_rProxy || 'https://api.anthropic.com').replace(/\/v1 *$/,'')}/v1/${messagesAPI ? 'messages' : 'complete'}`, {
                                 method: 'POST',
