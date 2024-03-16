@@ -7,7 +7,7 @@
 const {createServer: Server, IncomingMessage, ServerResponse} = require('node:http'), {createHash: Hash, randomUUID, randomInt, randomBytes} = require('node:crypto'), {TransformStream, ReadableStream} = require('node:stream/web'), {Readable, Writable} = require('node:stream'), {Blob} = require('node:buffer'), {existsSync: exists, writeFileSync: write, createWriteStream} = require('node:fs'), {join: joinP} = require('node:path'), {ClewdSuperfetch: Superfetch, SuperfetchAvailable} = require('./lib/clewd-superfetch'), {AI, fileName, genericFixes, bytesToSize, setTitle, checkResErr, Replacements, Main} = require('./lib/clewd-utils'), ClewdStream = require('./lib/clewd-stream');
 
 /******************************************************* */
-let currentIndex, Firstlogin = true, changeflag = 0, changing, changetime = 0, totaltime, invalidtime = 0, uuidOrgArray = [], model, submodel, cookieModel, tokens, apiKey, timestamp, regexLog, isPro;
+let currentIndex, Firstlogin = true, changeflag = 0, changing, changetime = 0, totaltime, invalidtime = 0, uuidOrgArray = [], model, cookieModel, tokens, apiKey, timestamp, regexLog, isPro;
 
 const events = require('events'), CookieChanger = new events.EventEmitter();
 require('events').EventEmitter.defaultMaxListeners = 0;
@@ -25,12 +25,12 @@ CookieChanger.on('ChangeCookie', () => {
 const asyncPool = async (poolLimit, array, iteratorFn) => {
     const ret = [], executing = [];
     for (const item of array) {
-      const p = Promise.resolve().then(() => iteratorFn(item));
-      ret.push(p);
-      if (poolLimit <= array.length) {
-        const e = p.then(() => executing.splice(executing.indexOf(e), 1));
-        executing.push(e);
-        if (executing.length >= poolLimit) await Promise.race(executing);
+        const p = Promise.resolve().then(() => iteratorFn(item));
+        ret.push(p);
+        if (poolLimit <= array.length) {
+            const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+            executing.push(e);
+            if (executing.length >= poolLimit) await Promise.race(executing);
       }
     }
     return Promise.all(ret);
@@ -57,20 +57,13 @@ const asyncPool = async (poolLimit, array, iteratorFn) => {
     const padding = placeholder.repeat(Math.min(maxtokens, (tokens <= maxtokens - extralimit ? maxtokens - tokens : minlimit ? minlimit : extralimit)) / placeholdertokens);
     content = /<\|padtxt.*?\|>/.test(content) ? content.replace(/<\|padtxt.*?\|>/, padding).replace(/\s*<\|padtxt.*?\|>\s*/g, '\n\n') : !apiKey ? padding + '\n\n\n' + content.trim() : content;
     return content;
-}, xmlPlot_merge = (content, nonsys) => {
-    if (!content.includes('<|Merge Disable|>')) {
-        if (content.includes('<|System Role|>')) {
-            content = content.replace(/(?:\n\n|^\s*)(?:xmlPlot|System):(.*?(?:\n\n(Assistant|Human):|$))/gs, function(match, p1) {return '\n\nSystem:' + p1.replace(/(\n\n|^\s*)(xmlPlot|System):\s*/g, '\n\n')});
-        }
-        if (!content.includes('<|Merge Human Disable|>')) {
-            nonsys ? content = content.replace(/(\n\n|^\s*)xmlPlot:/g, '\n\nHuman:') : content = content.replace(/(\n\n|^\s*)(?<!\n\n(Human|Assistant):.*?)xmlPlot:\s*/gs, '$1').replace(/(\n\n|^\s*)xmlPlot:/g, '\n\nHuman:');
-            content = content.replace(/(?:\n\n|^\s*)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')});
-        }
-        if (!content.includes('<|Merge Assistant Disable|>')) {
-            content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')});
-        }
+}, xmlPlot_merge = (content, mergeTag, nonsys) => {
+    if (/(\n\n|^\s*)xmlPlot:\s*/.test(content)) {
+        content = (nonsys ? content : content.replace(/(\n\n|^\s*)(?<!\n\n(Human|Assistant):.*?)xmlPlot:\s*/gs, '$1')).replace(/(\n\n|^\s*)xmlPlot: */g, mergeTag.system && mergeTag.human && mergeTag.all ? '\n\nHuman: ' : '$1' );
     }
-    return content.replace(/(\n\n|^\s*)xmlPlot:\s*/gm, '$1');
+    mergeTag.all && mergeTag.human && (content = content.replace(/(?:\n\n|^\s*)Human:(.*?(?:\n\nAssistant:|$))/gs, function(match, p1) {return '\n\nHuman:' + p1.replace(/\n\nHuman:\s*/g, '\n\n')}));
+    mergeTag.all && mergeTag.assistant && (content = content.replace(/\n\nAssistant:(.*?(?:\n\nHuman:|$))/gs, function(match, p1) {return '\n\nAssistant:' + p1.replace(/\n\nAssistant:\s*/g, '\n\n')}));
+    return content;
 }, xmlPlot_regex = (content, order) => {
     let matches = content.match(new RegExp(`<regex(?: +order *= *${order})${order === 2 ? '?' : ''}> *"(/?)(.*)\\1(.*?)" *: *"(.*?)" *</regex>`, 'gm'));
     matches && matches.forEach(match => {
@@ -88,24 +81,25 @@ const asyncPool = async (poolLimit, array, iteratorFn) => {
     //一次正则
     content = xmlPlot_regex(content, 1);
     //一次role合并
-    content = xmlPlot_merge(content, nonsys);
+    const mergeTag = {
+        all: !content.includes('<|Merge Disable|>'),
+        system: !content.includes('<|Merge System Disable|>'),
+        human: !content.includes('<|Merge Human Disable|>'),
+        assistant: !content.includes('<|Merge Assistant Disable|>')
+    };
+    content = xmlPlot_merge(content, mergeTag, nonsys);
     //自定义插入
-    content = content.replace(/(<\/?)PrevAssistant>/gm, '$1@1>').replace(/(<\/?)PrevHuman>/gm, '$1@2>');
-    let splitContent = content.split(/\n\n(?=Assistant:|Human:)/g);
-    let match;
+    let splitContent = content.split(/\n\n(?=Assistant:|Human:)/g), match;
     while ((match = /<@(\d+)>(.*?)<\/@\1>/gs.exec(content)) !== null) {
         let index = splitContent.length - parseInt(match[1]) - 1;
-        if (index >= 0) {
-            splitContent[index] += '\n\n' + match[2];
-        }
+        index >= 0 && (splitContent[index] += '\n\n' + match[2]);
         content = content.replace(match[0], '');
     }
-    content = splitContent.join('\n\n');
-    content = content.replace(/<@(\d+)>.*?<\/@\1>/gs, '');
+    content = splitContent.join('\n\n').replace(/<@(\d+)>.*?<\/@\1>/gs, '');
     //二次正则
     content = xmlPlot_regex(content, 2);
     //二次role合并
-    content = xmlPlot_merge(content, nonsys);
+    content = xmlPlot_merge(content, mergeTag, nonsys);
     //Plain Prompt
     let segcontentHuman = content.split('\n\nHuman:');
     let segcontentlastIndex = segcontentHuman.length - 1;
@@ -120,11 +114,7 @@ const asyncPool = async (poolLimit, array, iteratorFn) => {
         .replace(/\\r/gm, '\r')
         .replace(/\s*<\|curtail\|>\s*/g, '\n')
         .replace(/\s*<\|join\|>\s*/g, '')
-        .replace(/\n<\/(card|hidden|META)>\s+?<\1>\n/g, '\n')
-        .replace(/\n<(\/?card|example|hidden|plot|META)>\s+?<\1>/g, '\n<$1>')
-        .replace(/(?:<!--.*?-->\n|.+?: ?\n)?<(card|example|hidden|plot|META)>\s+?<\/\1>\n*/g, '')
-        .replace(/(?<=(: |\n)<(card|hidden|example|plot|META|EOT)>\n)\s*/g, '')
-        .replace(/\s*(?=\n<\/(card|hidden|example|plot|META|EOT)>(\n|$))/g, '')
+        .replace(/\s*<\|space\|>\s*/g, ' ')
         .replace(/\s*\n\n(H(uman)?|A(ssistant)?): +/g, '\n\n$1: ');
     //确保格式正确
     if (apiKey) {
@@ -236,7 +226,7 @@ const updateParams = res => {
         return;
     }
     try { //
-        const res = await fetch(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg}/chat_conversations/${uuid}`, {
+        const res = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg}/chat_conversations/${uuid}`, {
             headers: {
                 ...AI.hdr(),
                 Cookie: getCookies()
@@ -244,7 +234,8 @@ const updateParams = res => {
             method: 'DELETE'
         });
         updateParams(res);
-    } catch (err) {console.log(`[33mdeleteChat failed[0m`)}; //
+        await checkResErr(res); //
+    } catch (err) {console.log('[33mdeleteChat failed[0m\n%o', err)}; //
 }, onListen = async () => {
 /***************************** */
     if (Firstlogin) {
@@ -278,20 +269,21 @@ const updateParams = res => {
     updateCookies(Config.Cookie.match(/(sessionKey=)?sk-ant-sid01-[\w-]{86}-[\w-]{6}AA/g)[0].replace(/^(sessionKey=)?/, 'sessionKey=')); //updateCookies(Config.Cookie);
     //console.log(`[2m${Main}[0m\n[33mhttp://${Config.Ip}:${Config.Port}/v1[0m\n\n${Object.keys(Config.Settings).map((setting => UnknownSettings.includes(setting) ? `??? [31m${setting}: ${Config.Settings[setting]}[0m` : `[1m${setting}:[0m ${ChangedSettings.includes(setting) ? '[33m' : '[36m'}${Config.Settings[setting]}[0m`)).sort().join('\n')}\n`);
     //Config.Settings.Superfetch && SuperfetchAvailable(true);
-    const accRes = await fetch((Config.rProxy || AI.end()) + '/api/organizations', {
+    const accRes = await (Config.Settings.Superfetch ? Superfetch : fetch)((Config.rProxy || AI.end()) + '/api/organizations', {
         method: 'GET',
         headers: {
             ...AI.hdr(),
             Cookie: getCookies()
         }
     });
-/**************************** */
-    if (accRes.statusText === 'Forbidden') {
+/***************************** */
+    const accErr = await checkResErr(accRes, false ,false); //await checkResErr(accRes);
+    if (accErr?.status === 403 && !/request/i.test(accErr?.message)) {
         console.log(`[31mExpired![0m`);
         return CookieCleaner(percentage);
     }
-/**************************** */
-    await checkResErr(accRes);
+    if (accErr?.status < 200 || accErr?.status >= 300) throw accErr;
+/***************************** */
     const accInfo = (await accRes.json())?.find(item => item.capabilities.includes('chat')); //const accInfo = (await accRes.json())?.[0];
     if (!accInfo || accInfo.error) {
         throw Error(`Couldn't get account info: "${accInfo?.error?.message || accRes.statusText}"`);
@@ -306,24 +298,23 @@ const updateParams = res => {
         console.log(`[31mOverlap![0m`);
         return CookieCleaner(percentage);
     } else uuidOrgArray.push(accInfo.uuid);
-    const statsigRes = await fetch((Config.rProxy || AI.end()) + `/api/account/statsig/${accInfo.uuid}`, {
+    const statsigRes = await (Config.Settings.Superfetch ? Superfetch : fetch)((Config.rProxy || AI.end()) + `/api/account/statsig/${accInfo.uuid}`, {
         method: 'GET',
         headers: {
             ...AI.hdr(),
             Cookie: getCookies()
         }
     });
-    await checkResErr(statsigRes);
     const statsig = await statsigRes.json();
-    model = statsig.values.dynamic_configs["6zA9wvTedwkzjLxWy9PVe7yydI00XDQ6L5Fejjq/2o8="]?.value?.model, cookieModel = model;
+    cookieModel = statsig.values.dynamic_configs["6zA9wvTedwkzjLxWy9PVe7yydI00XDQ6L5Fejjq/2o8="]?.value?.model;
     isPro = statsig.user.custom.isPro || accInfo.capabilities.includes('claude_pro');
-    if (!isPro && submodel && submodel != cookieModel && !Config.Settings.PassParams) return CookieChanger.emit('ChangeCookie');
+    if (!isPro && model && model != cookieModel && !Config.Settings.PassParams) return CookieChanger.emit('ChangeCookie');
     if (statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0].gateValue === 'true' && statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0].gate === 'segment:abuse' || Config.Cookiecounter >= 0 && !Main?.includes('aret'.split('').reverse().join('')) && Boolean(Math.random()*1.05)) return CookieCleaner(percentage);
 /**************************** */
     console.log(Config.CookieArray?.length > 0 ? `(index: [36m${currentIndex || Config.CookieArray.length}[0m) Logged in %o` : 'Logged in %o', { //console.log('Logged in %o', {
         name: accInfo.name?.split('@')?.[0],
         mail: statsig.user.email, //
-        model, //
+        cookieModel, //
         capabilities: accInfo.capabilities
     });
     uuidOrg = accInfo?.uuid;
@@ -345,7 +336,7 @@ const updateParams = res => {
             if ('consumer_restricted_mode' === type || 'consumer_banned' === type) { //if ('consumer_restricted_mode' === type) {
                 return;
             }
-            const req = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy || AI.end()}/api/organizations/${accInfo.uuid}/flags/${type}/dismiss`, { //const req = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg}/flags/${type}/dismiss`, {
+            const req = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg}/flags/${type}/dismiss`, {
                 headers: {
                     ...AI.hdr(),
                     Cookie: getCookies()
@@ -368,7 +359,7 @@ const updateParams = res => {
         return CookieChanger.emit('ChangeCookie');
     }
 /***************************** */
-    const convRes = await fetch(`${Config.rProxy || AI.end()}/api/organizations/${accInfo.uuid}/chat_conversations`, { //const convRes = await fetch(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg}/chat_conversations`, {
+    const convRes = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy || AI.end()}/api/organizations/${accInfo.uuid}/chat_conversations`, { //const convRes = await fetch(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg}/chat_conversations`, {
         method: 'GET',
         headers: {
             ...AI.hdr(),
@@ -408,6 +399,7 @@ const updateParams = res => {
                 ...AI.mdl().map((name => ({ id: name }))), {
                     id: 'claude-default'            },{
                     id: 'claude-1.3'                },{
+                    id: 'claude-3-haiku-20240307'   },{
                     id: 'claude-instant-1.1'        //id: name
             }] //})))
 /***************************** */
@@ -437,11 +429,10 @@ const updateParams = res => {
                     const thirdKey = req.headers.authorization?.match(/(?<=3rdKey:).*/);
                     apiKey = thirdKey?.map(item => item.trim())[0].split(/ ?, ?/) || req.headers.authorization?.match(/sk-ant-api\d\d-[\w-]{86}-[\w-]{6}AA/g);
                     model = apiKey || Config.Settings.PassParams && /claude-(?!default)/.test(body.model) || isPro && AI.mdl().includes(body.model) ? body.model : cookieModel;
-                    submodel = /claude-\d.+/.test(body.model) ? body.model : '';
                     let max_tokens_to_sample = body.max_tokens, stop_sequences = body.stop || [], top_p = body.top_p, top_k = body.top_k;
                     if (!apiKey && Config.ProxyPassword != '' && req.headers.authorization != 'Bearer ' + Config.ProxyPassword) {
                         throw Error('ProxyPassword Wrong');
-                    } else if (!changing && !apiKey && (!Config.Settings.PassParams && !isPro && submodel && submodel != cookieModel || invalidtime > Config.CookieArray?.length)) {
+                    } else if (!changing && !apiKey && (!Config.Settings.PassParams && !isPro && model != cookieModel || invalidtime > Config.CookieArray?.length)) {
                         changing = true;
                         CookieChanger.emit('ChangeCookie');
                     }
@@ -679,7 +670,7 @@ const updateParams = res => {
 /******************************** */
                     console.log(`${model} [[2m${type}[0m]${!retryRegen && systems.length > 0 ? ' ' + systems.join(' [33m/[0m ') : ''}`);
                     'R' !== type || prompt || (prompt = '...regen...');
-                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### ${model} (${type}) regex:\n${regexLog}\n####### PROMPT ${tokens}t:\n${prompt}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### MODEL: ${model}\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
+                    Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n${Main}\n####### ${model} (${type}) regex:\n${regexLog}\n####### PROMPT ${tokens}t:\n${prompt}\n--\n####### REPLY:\n`); //Logger?.write(`\n\n-------\n[${(new Date).toLocaleString()}]\n####### MODEL: ${model}\n####### PROMPT (${type}):\n${prompt}\n--\n####### REPLY:\n`);
                     retryRegen || (fetchAPI = await (async (signal, model, prompt, temperature, type) => {
 /******************************** */
                         if (apiKey) {
