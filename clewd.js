@@ -234,8 +234,8 @@ const updateParams = res => {
 /***************************** */
     if (Firstlogin) {
         Firstlogin = false, timestamp = Date.now(), totaltime = Config.CookieArray.length;
-        console.log(`[2m${Main}[0m\n[33mhttp://${Config.Ip}:${Config.Port}/v1[0m\n\n${Object.keys(Config.Settings).map((setting => UnknownSettings?.includes(setting) ? `??? [31m${setting}: ${Config.Settings[setting]}[0m` : `[1m${setting}:[0m ${ChangedSettings?.includes(setting) ? '[33m' : '[36m'}${Config.Settings[setting]}[0m`)).sort().join('\n')}\n`);
-        Config.Settings.Superfetch && SuperfetchAvailable(true);
+        console.log(`[2m${Main}[0m\n[33mhttp://${Config.Ip}:${Config.Port}/v1[0m\n\n${Object.keys(Config.Settings).map((setting => UnknownSettings?.includes(setting) ? `??? [31m${setting}: ${Config.Settings[setting]}[0m` : `[1m${setting}:[0m ${ChangedSettings?.includes(setting) ? '[33m' : '[36m'}${Config.Settings[setting]}[0m`)).sort().join('\n')}\n`); //↓
+        Config.Settings.Superfetch && SuperfetchAvailable(true); //↓
         if (Config.localtunnel) {
             const localtunnel = require('localtunnel');
             localtunnel({ port: Config.Port }).then((tunnel) => {
@@ -260,8 +260,35 @@ const updateParams = res => {
         return console.log(`[33mNo cookie available, apiKey-Only mode enabled.[0m\n`); //throw Error('Set your cookie inside config.js');
     }
     updateCookies(Config.Cookie.match(/(sessionKey=)?sk-ant-sid01-[\w-]{86}-[\w-]{6}AA/g)[0].replace(/^(sessionKey=)?/, 'sessionKey=')); //updateCookies(Config.Cookie);
-    //console.log(`[2m${Main}[0m\n[33mhttp://${Config.Ip}:${Config.Port}/v1[0m\n\n${Object.keys(Config.Settings).map((setting => UnknownSettings.includes(setting) ? `??? [31m${setting}: ${Config.Settings[setting]}[0m` : `[1m${setting}:[0m ${ChangedSettings.includes(setting) ? '[33m' : '[36m'}${Config.Settings[setting]}[0m`)).sort().join('\n')}\n`);
-    //Config.Settings.Superfetch && SuperfetchAvailable(true);
+/**************************** */
+    const bootstrapRes = await (Config.Settings.Superfetch ? Superfetch : fetch)((Config.rProxy || AI.end()) + `/api/bootstrap`, {
+        method: 'GET',
+        headers: {
+            ...AI.hdr(),
+            Cookie: getCookies()
+        }
+    });
+    await checkResErr(bootstrapRes);
+    const bootstrap = await bootstrapRes.json(), bootAccInfo = bootstrap.account.memberships.find(item => item.organization.capabilities.includes('chat')).organization;
+    if (uuidOrgArray.includes(bootAccInfo.uuid) && percentage <= 100 && Config.CookieArray?.length > 0 || bootAccInfo.api_disabled_reason && !bootAccInfo.api_disabled_until || !bootstrap.account.completed_verification_at) {
+        console.log(`[31m${bootAccInfo.api_disabled_reason ? 'Disabled' : !bootstrap.account.completed_verification_at ? 'Unverified' : 'Overlap'}![0m`);
+        return CookieCleaner(percentage);
+    } else uuidOrgArray.push(bootAccInfo.uuid);
+    cookieModel = bootstrap.statsig.values.layer_configs["HPOHwBLNLQLxkj5Yn4bfSkgCQnBX28kPR7h/BNKdVLw="]?.value?.console_default_model_override?.model || bootstrap.statsig.values.dynamic_configs["6zA9wvTedwkzjLxWy9PVe7yydI00XDQ6L5Fejjq/2o8="]?.value?.model;
+    isPro = bootAccInfo.capabilities.includes('claude_pro');
+    if (!isPro && model && model != cookieModel && !Config.Settings.PassParams) return CookieChanger();
+    console.log(Config.CookieArray?.length > 0 ? `(index: [36m${currentIndex || Config.CookieArray.length}[0m) Logged in %o` : 'Logged in %o', { //console.log('Logged in %o', { ↓
+        name: bootAccInfo.name?.split('@')?.[0],
+        mail: bootstrap.account.email_address, //
+        cookieModel, //
+        capabilities: bootAccInfo.capabilities
+    }); //↓
+    if (Config.Cookiecounter < 0) {
+        console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
+        return CookieChanger();
+    }
+    changing = false;
+/**************************** */
     const accRes = await (Config.Settings.Superfetch ? Superfetch : fetch)((Config.rProxy || AI.end()) + '/api/organizations', {
         method: 'GET',
         headers: {
@@ -270,39 +297,9 @@ const updateParams = res => {
         }
     });
     await checkResErr(accRes);
-    const accInfo = (await accRes.json())?.find(item => item.capabilities.includes('chat')); //const accInfo = (await accRes.json())?.[0];
-    if (!accInfo || accInfo.error) {
-        throw Error(`Couldn't get account info: "${accInfo?.error?.message || accRes.statusText}"`);
-    }
-    if (!accInfo?.uuid) {
-        throw Error('Invalid account id');
-    }
+    const accInfo = (await accRes.json())?.find(item => item.capabilities.includes('chat')); //const accInfo = (await accRes.json())?.[0];\nif (!accInfo || accInfo.error) {\n    throw Error(`Couldn't get account info: "${accInfo?.error?.message || accRes.statusText}"`);\n}\nif (!accInfo?.uuid) {\n    throw Error('Invalid account id');\n}
     setTitle('ok');
     updateParams(accRes);
-/**************************** */
-    if (uuidOrgArray.includes(accInfo.uuid) && percentage <= 100 && Config.CookieArray?.length > 0 || accInfo.api_disabled_reason && !accInfo.api_disabled_until) {
-        accInfo.api_disabled_reason ? console.log(`[31mDisabled![0m`) : console.log(`[31mOverlap![0m`);
-        return CookieCleaner(percentage);
-    } else uuidOrgArray.push(accInfo.uuid);
-    const statsigRes = await (Config.Settings.Superfetch ? Superfetch : fetch)((Config.rProxy || AI.end()) + `/api/account/statsig/${accInfo.uuid}`, {
-        method: 'GET',
-        headers: {
-            ...AI.hdr(),
-            Cookie: getCookies()
-        }
-    });
-    const statsig = await statsigRes.json();
-    cookieModel = statsig.values.dynamic_configs["6zA9wvTedwkzjLxWy9PVe7yydI00XDQ6L5Fejjq/2o8="]?.value?.model;
-    isPro = statsig.user.custom.isPro || accInfo.capabilities.includes('claude_pro');
-    if (!isPro && model && model != cookieModel && !Config.Settings.PassParams) return CookieChanger();
-    if (statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0].gateValue === 'true' && statsig.values.feature_gates["4fDxNAVXgvks8yzKUoU+T+w3Qr3oYVqoJJVNYh04Mik="]?.secondary_exposures[0].gate === 'segment:abuse' || Config.Cookiecounter >= 0 && !Main?.includes('aret'.split('').reverse().join('')) && Boolean(Math.random()*1.05)) return CookieCleaner(percentage);
-/**************************** */
-    console.log(Config.CookieArray?.length > 0 ? `(index: [36m${currentIndex || Config.CookieArray.length}[0m) Logged in %o` : 'Logged in %o', { //console.log('Logged in %o', {
-        name: accInfo.name?.split('@')?.[0],
-        mail: statsig.user.email, //
-        cookieModel, //
-        capabilities: accInfo.capabilities
-    });
     uuidOrg = accInfo?.uuid;
     if (accInfo?.active_flags.length > 0) {
         let flagtype; //
@@ -333,18 +330,9 @@ const updateParams = res => {
             const json = await req.json();
             console.log(`${type}: ${json.error ? json.error.message || json.error.type || json.detail : 'OK'}`);
         })(flag.type))));
-/***************************** */
-        if (Config.CookieArray?.length > 0) { //}
-            console.log(`${'consumer_banned' === flagtype ? '[31mBanned' : '[35mRestricted'}![0m`);
-            return 'consumer_banned' === flagtype ? CookieCleaner(percentage) : Config.Settings.SkipRestricted && CookieChanger();
-        }
+        console.log(`${'consumer_banned' === flagtype ? '[31mBanned' : '[35mRestricted'}![0m`); //
+        return 'consumer_banned' === flagtype ? CookieCleaner() : Config.Settings.SkipRestricted && CookieChanger(); //
     }
-    if (Config.Cookiecounter < 0) {
-        console.log(`[progress]: [32m${percentage.toFixed(2)}%[0m\n[length]: [33m${Config.CookieArray.length}[0m\n`);
-        return CookieChanger();
-    }
-    changing = false;
-/***************************** */
     const convRes = await (Config.Settings.Superfetch ? Superfetch : fetch)(`${Config.rProxy || AI.end()}/api/organizations/${accInfo.uuid}/chat_conversations`, { //const convRes = await fetch(`${Config.rProxy || AI.end()}/api/organizations/${uuidOrg}/chat_conversations`, {
         method: 'GET',
         headers: {
@@ -772,7 +760,8 @@ const updateParams = res => {
                     if ('AbortError' === err.name) {
                         res.end();
                     } else {
-                        err.planned ? console.log(`[33m${err.status}![0m\n`) : console.error('[33mClewd:[0m\n%o', err); //err.planned || console.error('[33mClewd:[0m\n%o', err);
+                        nochange = true, exceeded_limit = err.exceeded_limit; //
+                        err.planned ? console.log(`[33m${err.status || 'Aborted'}![0m\n`) : console.error('[33mClewd:[0m\n%o', err); //err.planned || console.error('[33mClewd:[0m\n%o', err);
                         res.json({
                             error: {
                                 message: 'clewd: ' + (err.message || err.name || err.type),
@@ -781,13 +770,6 @@ const updateParams = res => {
                                 code: err.code || 500
                             }
                         }, 500);
-/******************************** */
-                        nochange = true, exceeded_limit = err.exceeded_limit;
-                        if(err.message === 'account_needs_verification') {
-                            console.log(`[31mUnverified![0m\n`);
-                            CookieCleaner();
-                        }
-/******************************** */
                     }
                 }
                 clearInterval(titleTimer);
@@ -803,7 +785,7 @@ const updateParams = res => {
                 if (!apiKey && (Config.Settings.RenewAlways || prevImpersonated)) { //if (prevImpersonated) { try {
                     await deleteChat(Conversation.uuid);
 /******************************** */
-                    if (!nochange && Config.CookieArray?.length > 0 && (exceeded_limit || Config.Cookiecounter > 0 && changeflag++ >= Config.Cookiecounter - 1)) {
+                    if (Config.CookieArray?.length > 0 && (exceeded_limit || !nochange && Config.Cookiecounter > 0 && changeflag++ >= Config.Cookiecounter - 1)) {
                         exceeded_limit && console.log(`[35mExceeded limit![0m\n`);
                         changeflag = 0;
                         CookieChanger();
@@ -827,8 +809,7 @@ const updateParams = res => {
         !['/', '/v1', '/favicon.ico'].includes(req.url) && (console.log('unknown request: ' + req.url)); //console.log('unknown request: ' + req.url);
         res.writeHead(200, {'Content-Type': 'text/html'}); //
         res.write(`<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<script>\nfunction copyToClipboard(text) {\n  var textarea = document.createElement("textarea");\n  textarea.textContent = text;\n  textarea.style.position = "fixed";\n  document.body.appendChild(textarea);\n  textarea.select();\n  try {\n    return document.execCommand("copy");\n  } catch (ex) {\n    console.warn("Copy to clipboard failed.", ex);\n    return false;\n  } finally {\n    document.body.removeChild(textarea);\n  }\n}\nfunction copyLink(event) {\n  event.preventDefault();\n  const url = new URL(window.location.href);\n  const link = url.protocol + '//' + url.host + '/v1';\n  copyToClipboard(link);\n  alert('链接已复制: ' + link);\n}\n</script>\n</head>\n<body>\n${Main}<br/><br/>完全开源、免费且禁止商用<br/><br/>点击复制反向代理: <a href="v1" onclick="copyLink(event)">Copy Link</a><br/>填入OpenAI API反向代理并选择OpenAI分类中的claude模型（酒馆需打开Show "External" models，仅在api模式有模型选择差异）<br/><br/>教程与FAQ: <a href="https://rentry.org/teralomaniac_clewd" target="FAQ">Rentry</a> | <a href="https://discord.com/invite/B7Wr25Z7BZ" target="FAQ">Discord</a><br/><br/><br/>❗警惕任何高风险cookie/伪api(25k cookie)购买服务，以及破坏中文AI开源共享环境倒卖免费资源抹去署名的群组（🈲黑名单：AI新服务、浅睡(鲑鱼)、赛博女友(青麈/科普晓百生)🈲）\n</body>\n</html>`); //
-        res.end(); //
-        //res.json(//    {//    error: {//        message: '404 Not Found',//        type: 404,//        param: null,//        code: 404//    }//}, 404);
+        res.end(); //res.json(//    {//    error: {//        message: '404 Not Found',//        type: 404,//        param: null,//        code: 404//    }//}, 404);
     }
 }));
 
